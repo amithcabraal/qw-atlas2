@@ -56,11 +56,11 @@ export default function HostView({
     setIsRevealing(false);
   }, [currentQuestion]);
 
-  // Update displayed answers when prop answers change and we're showing answers
+  // Update displayed answers when answers prop changes
   useEffect(() => {
     if (showingAnswers) {
       const relevantAnswers = propAnswers.filter(a => a.question_id === question.id);
-      console.log('Setting displayed answers:', relevantAnswers);
+      console.log('Updating displayed answers:', relevantAnswers);
       setDisplayedAnswers(relevantAnswers);
     }
   }, [propAnswers, question.id, showingAnswers]);
@@ -111,12 +111,15 @@ export default function HostView({
       }
     } catch (err) {
       console.error('Error revealing answers:', err);
+      setShowingAnswers(false);
     } finally {
       setIsRevealing(false);
     }
   };
 
   const handleNext = () => {
+    setShowingAnswers(false);
+    setDisplayedAnswers([]);
     onNextQuestion();
   };
 
@@ -137,7 +140,9 @@ export default function HostView({
                 ? 'Waiting for all players...' 
                 : isRevealing 
                   ? 'Revealing...' 
-                  : 'Reveal Answers'}
+                  : showingAnswers
+                    ? 'Show Answers Again'
+                    : 'Reveal Answers'}
             </button>
             {showingAnswers && (
               <button
