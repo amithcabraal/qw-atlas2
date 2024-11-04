@@ -30,11 +30,16 @@ export default function PlayerView({
   const [selectedLocation, setSelectedLocation] = useState<[number, number] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleMapClick = async (e: MapLayerMouseEvent) => {
+  const handleMapClick = (e: MapLayerMouseEvent) => {
     if (hasAnswered || isSubmitting) return;
-
-    const [longitude, latitude] = e.lngLat.toArray();
-    setSelectedLocation([longitude, latitude]);
+    
+    // Safe access to coordinates
+    const lng = e.lngLat?.lng;
+    const lat = e.lngLat?.lat;
+    
+    if (typeof lng === 'number' && typeof lat === 'number') {
+      setSelectedLocation([lng, lat]);
+    }
   };
 
   const handleSubmit = async () => {
