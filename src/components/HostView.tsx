@@ -67,21 +67,21 @@ export default function HostView({
 
   // Update displayed answers when answers prop changes or showing state changes
   useEffect(() => {
-    console.log('Answers prop changed:', propAnswers);
+    console.log('Answers or showing state changed:', {
+      showingAnswers,
+      answersCount: propAnswers.length,
+      currentQuestion
+    });
     
     if (showingAnswers) {
-      // Only show answers for the current question
-      console.log("About to filter propanswers based on a.question === ", currentQuestion);
-      
-      const relevantAnswers = propAnswers.filter(a => a.question_id === currentQuestion);
+      // Filter answers for the current question
+      const relevantAnswers = propAnswers.filter(a => a.question_id === question.id);
       console.log('Setting displayed answers:', relevantAnswers);
       setDisplayedAnswers(relevantAnswers);
     } else {
-      console.log("showingAnswers is false, so setting displayed answers to []");
-                  
       setDisplayedAnswers([]);
     }
-  }, [propAnswers, showingAnswers, currentQuestion]);
+  }, [propAnswers, showingAnswers, currentQuestion, question.id]);
 
   // Prepare markers for the map
   const markers = showingAnswers ? [
@@ -109,31 +109,28 @@ export default function HostView({
 
     try {
       setIsRevealing(true);
+      setShowingAnswers(true); // Set this immediately
       
       // Update game status
       onRevealAnswers();
 
       // Fetch answers for current question
-      console.log ("Fetching answers for current question", currentQuestion);
-      
       const { data: answersData, error: answersError } = await supabase
         .from('answers')
         .select('*')
         .eq('game_id', gameId)
-        .eq('question_id', currentQuestion);
+        .eq('question_id', question.id); // Use question.id instead of currentQuestion
 
       if (answersError) throw answersError;
 
+      console.log('Fetched answers on reveal:', answersData);
       
-      console.log('Fetched answers on reveal (question: ', currentQuestion, ') :', answersData);
-      
-      // Update local state
-      setShowingAnswers(true);
       if (answersData) {
         setDisplayedAnswers(answersData);
       }
     } catch (err) {
       console.error('Error revealing answers:', err);
+      setShowingAnswers(false); // Reset on error
     } finally {
       setIsRevealing(false);
     }
@@ -153,7 +150,7 @@ export default function HostView({
           <div className="mt-4 space-y-4">
             <button
               onClick={handleReveal}
-              disabled={!allPlayersAnswered || showingAnswers || isRevealing}
+              disabled={!allPlayersAnswered || isRevealing}
               className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 
                        text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
