@@ -1,5 +1,8 @@
+-- Enable real-time for required tables
+alter publication supabase_realtime add table players;
+
 -- Create tables for the GeoQuiz game
-create table games (
+create table if not exists games (
   id uuid default gen_random_uuid() primary key,
   code text not null unique,
   status text not null check (status in ('waiting', 'playing', 'revealing', 'finished')),
@@ -8,7 +11,7 @@ create table games (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
-create table players (
+create table if not exists players (
   id uuid primary key,
   initials text not null,
   game_id uuid references games(id) on delete cascade,
@@ -17,7 +20,7 @@ create table players (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
-create table answers (
+create table if not exists answers (
   id uuid default gen_random_uuid() primary key,
   player_id uuid references players(id) on delete cascade,
   game_id uuid references games(id) on delete cascade,
