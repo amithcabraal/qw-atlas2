@@ -77,7 +77,7 @@ export default function HostView({
       console.log('Setting displayed answers:', relevantAnswers);
       setDisplayedAnswers(relevantAnswers);
     } else {
-      console/log("showingAnswers is false, so setting displayed answers to []");
+      console.log("showingAnswers is false, so setting displayed answers to []");
                   
       setDisplayedAnswers([]);
     }
