@@ -69,6 +69,7 @@ export default function PlayGame() {
         
         if (mounted) {
           setGame(gameData);
+          console.log('Game data loaded:', gameData);
         }
 
         // Fetch initial players
@@ -81,6 +82,7 @@ export default function PlayGame() {
         
         if (mounted) {
           setPlayers(playersData || []);
+          console.log('Players loaded:', playersData);
           if (playerId && playersData) {
             const player = playersData.find(p => p.id === playerId);
             setCurrentPlayer(player || null);
@@ -89,14 +91,17 @@ export default function PlayGame() {
 
         // Fetch current answers if in revealing state
         if (gameData.status === 'revealing') {
-          const { data: answersData } = await supabase
+          const { data: answersData, error: answersError } = await supabase
             .from('answers')
             .select('*')
             .eq('game_id', gameId)
             .eq('question_id', gameData.current_question);
 
+          if (answersError) throw answersError;
+
           if (mounted && answersData) {
             setAnswers(answersData);
+            console.log('Answers loaded:', answersData);
           }
         }
 
@@ -113,7 +118,7 @@ export default function PlayGame() {
     };
 
     // Set up real-time subscriptions
-    const channel = supabase.channel(`game:${gameId}`)
+    const gameChannel = supabase.channel(`game:${gameId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` },
@@ -146,7 +151,9 @@ export default function PlayGame() {
             }
           }
         }
-      )
+      );
+
+    const answersChannel = supabase.channel(`answers:${gameId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'answers', filter: `game_id=eq.${gameId}` },
@@ -162,8 +169,11 @@ export default function PlayGame() {
 
     // Start subscriptions and initial data fetch
     Promise.all([
-      channel.subscribe((status) => {
-        console.log('Channel status:', status);
+      gameChannel.subscribe((status) => {
+        console.log('Game channel status:', status);
+      }),
+      answersChannel.subscribe((status) => {
+        console.log('Answers channel status:', status);
       }),
       setupSubscriptions()
     ]).catch(err => {
@@ -175,53 +185,67 @@ export default function PlayGame() {
 
     return () => {
       mounted = false;
-      supabase.removeChannel(channel);
+      supabase.removeChannel(gameChannel);
+      supabase.removeChannel(answersChannel);
     };
   }, [gameId, playerId]);
 
   const handleNextQuestion = async () => {
     if (!game || !gameId) return;
 
-    const nextQuestion = game.current_question + 1;
-    if (nextQuestion >= questions.length) {
-      await supabase
-        .from('games')
-        .update({ status: 'finished' })
-        .eq('id', gameId);
-    } else {
-      await supabase
-        .from('games')
-        .update({
-          current_question: nextQuestion,
-          status: 'playing'
-        })
-        .eq('id', gameId);
+    try {
+      const nextQuestion = game.current_question + 1;
+      
+      if (nextQuestion >= questions.length) {
+        await supabase
+          .from('games')
+          .update({ status: 'finished' })
+          .eq('id', gameId);
+      } else {
+        // Update game status first
+        await supabase
+          .from('games')
+          .update({
+            current_question: nextQuestion,
+            status: 'playing'
+          })
+          .eq('id', gameId);
 
-      await supabase
-        .from('players')
-        .update({ has_answered: false })
-        .eq('game_id', gameId);
+        // Then reset player answers
+        await supabase
+          .from('players')
+          .update({ has_answered: false })
+          .eq('game_id', gameId);
 
-      setAnswers([]);
+        setAnswers([]);
+      }
+    } catch (err) {
+      console.error('Error advancing to next question:', err);
     }
   };
 
   const handleRevealAnswers = async () => {
     if (!gameId || !game) return;
 
-    await supabase
-      .from('games')
-      .update({ status: 'revealing' })
-      .eq('id', gameId);
+    try {
+      await supabase
+        .from('games')
+        .update({ status: 'revealing' })
+        .eq('id', gameId);
 
-    const { data: answersData } = await supabase
-      .from('answers')
-      .select('*')
-      .eq('game_id', gameId)
-      .eq('question_id', questions[game.current_question].id);
+      const { data: answersData, error: answersError } = await supabase
+        .from('answers')
+        .select('*')
+        .eq('game_id', gameId)
+        .eq('question_id', game.current_question);
 
-    if (answersData) {
-      setAnswers(answersData);
+      if (answersError) throw answersError;
+
+      if (answersData) {
+        setAnswers(answersData);
+      }
+    } catch (err) {
+      console.error('Error revealing answers:', err);
     }
   };
 
