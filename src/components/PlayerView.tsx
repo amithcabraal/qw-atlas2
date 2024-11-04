@@ -30,6 +30,11 @@ interface Player {
   initials: string;
 }
 
+interface Game {
+  status: 'waiting' | 'playing' | 'revealing' | 'finished';
+  current_question: number;
+}
+
 interface PlayerViewProps {
   gameId: string;
   playerId: string;
@@ -52,6 +57,7 @@ export default function PlayerView({
   const [isRevealing, setIsRevealing] = useState(false);
   const mapRef = useRef<any>(null);
 
+  // Reset state for new question
   useEffect(() => {
     setSelectedLocation(null);
     setError(null);
@@ -71,10 +77,28 @@ export default function PlayerView({
           table: 'games',
           filter: `id=eq.${gameId}`
         },
-        async (payload) => {
-          if (payload.new.status === 'revealing') {
+        async (payload: { new: Game }) => {
+          const newGame = payload.new;
+          
+          if (newGame.status === 'revealing') {
             setIsRevealing(true);
             await fetchAnswers();
+          } else if (newGame.status === 'playing') {
+            // Reset state for new question
+            setSelectedLocation(null);
+            setError(null);
+            setHasAnswered(false);
+            setAnswers([]);
+            setIsRevealing(false);
+            
+            // Reset map view
+            if (mapRef.current) {
+              mapRef.current.flyTo({
+                center: [0, 20],
+                zoom: 1.5,
+                duration: 1000
+              });
+            }
           }
         }
       )
