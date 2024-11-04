@@ -53,11 +53,11 @@ export default function HostView({
     setLocalPlayers(players);
   }, [players]);
 
-  // Update current answers when answers prop changes and showingAnswers is true
+  // Update current answers when answers prop changes or showingAnswers changes
   useEffect(() => {
     if (showingAnswers) {
       const filteredAnswers = answers.filter(a => a.question_id === question.id);
-      console.log('Filtered answers for question', question.id, ':', filteredAnswers);
+      console.log('Setting current answers:', filteredAnswers);
       setCurrentAnswers(filteredAnswers);
     }
   }, [answers, question.id, showingAnswers]);
@@ -94,12 +94,15 @@ export default function HostView({
           event: '*',
           schema: 'public',
           table: 'answers',
-          filter: `game_id=eq.${gameId} AND question_id=eq.${question.id}`
+          filter: `game_id=eq.${gameId}`
         },
         (payload) => {
           console.log('Answer update received:', payload);
           if (payload.eventType === 'INSERT' && showingAnswers) {
-            setCurrentAnswers(current => [...current, payload.new as Answer]);
+            const newAnswer = payload.new as Answer;
+            if (newAnswer.question_id === question.id) {
+              setCurrentAnswers(current => [...current, newAnswer]);
+            }
           }
         }
       );
@@ -144,8 +147,29 @@ export default function HostView({
   };
 
   const handleReveal = async () => {
+    // First set the state
     setShowingAnswers(true);
-    onRevealAnswers();
+    
+    try {
+      // Then fetch all answers for the current question
+      const { data: answersData, error: answersError } = await supabase
+        .from('answers')
+        .select('*')
+        .eq('game_id', gameId)
+        .eq('question_id', question.id);
+
+      if (answersError) throw answersError;
+
+      if (answersData) {
+        console.log('Fetched answers on reveal:', answersData);
+        setCurrentAnswers(answersData);
+      }
+
+      // Finally notify parent
+      onRevealAnswers();
+    } catch (err) {
+      console.error('Error fetching answers:', err);
+    }
   };
 
   return (
