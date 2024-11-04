@@ -91,9 +91,11 @@ export default function PlayGame() {
               const updatedGame = payload.new as Game;
               setGame(updatedGame);
               
-              // If the game status changes to 'playing', update player's has_answered status
+              // Reset player's answer status when moving to next question
               if (updatedGame.status === 'playing' && currentPlayer) {
                 setCurrentPlayer(prev => prev ? { ...prev, has_answered: false } : null);
+                // Clear answers when moving to next question
+                setAnswers([]);
               }
             }
           )
@@ -149,75 +151,6 @@ export default function PlayGame() {
 
     fetchGameData();
   }, [gameId, playerId]);
-
-  const handleNextQuestion = async () => {
-    if (!game || !gameId) return;
-
-    try {
-      const nextQuestion = game.current_question + 1;
-      
-      if (nextQuestion >= questions.length) {
-        await supabase
-          .from('games')
-          .update({ 
-            status: 'finished',
-            current_question: questions.length - 1
-          })
-          .eq('id', gameId);
-      } else {
-        // Clear answers first
-        setAnswers([]);
-        
-        // Update game status and move to next question
-        await supabase
-          .from('games')
-          .update({
-            current_question: nextQuestion,
-            status: 'playing'
-          })
-          .eq('id', gameId);
-
-        // Reset player answers
-        await supabase
-          .from('players')
-          .update({ has_answered: false })
-          .eq('game_id', gameId);
-      }
-    } catch (err) {
-      console.error('Error advancing to next question:', err);
-      setError('Failed to advance to next question');
-    }
-  };
-
-  const handleRevealAnswers = async () => {
-    if (!gameId || !game) return;
-
-    try {
-      // Update game status to revealing
-      const { error: updateError } = await supabase
-        .from('games')
-        .update({ status: 'revealing' })
-        .eq('id', gameId);
-
-      if (updateError) throw updateError;
-
-      // Fetch all answers for current question
-      const { data: answersData, error: answersError } = await supabase
-        .from('answers')
-        .select('*')
-        .eq('game_id', gameId)
-        .eq('question_id', game.current_question);
-
-      if (answersError) throw answersError;
-
-      if (answersData) {
-        setAnswers(answersData);
-      }
-    } catch (err) {
-      console.error('Error revealing answers:', err);
-      setError('Failed to reveal answers');
-    }
-  };
 
   if (loading) {
     return (
@@ -287,6 +220,7 @@ export default function PlayGame() {
         playerId={currentPlayer.id}
         question={currentQuestionData}
         hasAnswered={currentPlayer.has_answered}
+        gameStatus={game.status}
       />
     );
   }
