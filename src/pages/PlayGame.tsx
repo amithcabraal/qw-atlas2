@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { questions } from '../data/questions';
+import { useGameActions } from '../hooks/useGameActions';
 import HostView from '../components/HostView';
 import PlayerView from '../components/PlayerView';
 import PlayerList from '../components/PlayerList';
@@ -46,6 +47,14 @@ export default function PlayGame() {
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { handleNextQuestion, handleRevealAnswers, error: gameActionError } = useGameActions(gameId, questions.length);
+
+  useEffect(() => {
+    if (gameActionError) {
+      setError(gameActionError);
+    }
+  }, [gameActionError]);
 
   useEffect(() => {
     const fetchGameData = async () => {
@@ -207,8 +216,8 @@ export default function PlayGame() {
         currentQuestion={game.current_question}
         players={players}
         answers={answers}
-        onNextQuestion={handleNextQuestion}
-        onRevealAnswers={handleRevealAnswers}
+        onNextQuestion={() => handleNextQuestion(game.current_question)}
+        onRevealAnswers={() => handleRevealAnswers(game.current_question)}
       />
     );
   }
