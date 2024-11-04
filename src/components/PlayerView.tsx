@@ -82,12 +82,21 @@ export default function PlayerView({
 
       if (answerError) throw answerError;
 
-      // Then update player status and score
+      // First get current player score
+      const { data: playerData, error: fetchError } = await supabase
+        .from('players')
+        .select('score')
+        .eq('id', playerId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Then update player status and add new score
       const { error: playerError } = await supabase
         .from('players')
         .update({ 
           has_answered: true,
-          score: supabase.sql`score + ${score}`
+          score: (playerData?.score || 0) + score
         })
         .eq('id', playerId);
 
