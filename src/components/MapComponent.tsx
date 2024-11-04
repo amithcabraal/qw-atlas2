@@ -5,24 +5,39 @@ import { MapPin } from 'lucide-react';
 
 interface MapComponentProps {
   onMapClick?: (e: { lngLat: [number, number] }) => void;
-  markers?: Array<{ longitude: number; latitude: number }>;
-  answer?: { longitude: number; latitude: number };
+  markers?: Array<{ longitude: number; latitude: number; color?: string }>;
+  interactive?: boolean;
 }
 
-const MAPBOX_TOKEN = 'pk.eyJ1Ijoic3RhY2tibGl0eiIsImEiOiJjbHRpYnF3Y2UwMGRqMmtvNng4bDhiM3k0In0.x2qWypGm8M6bZKfYEXzUxg';
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
-export default function MapComponent({ onMapClick, markers = [], answer }: MapComponentProps) {
+export default function MapComponent({ 
+  onMapClick, 
+  markers = [], 
+  interactive = true 
+}: MapComponentProps) {
+  if (!MAPBOX_TOKEN) {
+    console.error('Mapbox token not found');
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-800 rounded-xl">
+        <p className="text-red-400">Map configuration error</p>
+      </div>
+    );
+  }
+
   return (
     <Map
       mapboxAccessToken={MAPBOX_TOKEN}
       initialViewState={{
         longitude: 0,
-        latitude: 0,
-        zoom: 1
+        latitude: 20,
+        zoom: 1.5
       }}
       style={{ width: '100%', height: '100%' }}
-      mapStyle="mapbox://styles/mapbox/streets-v12"
+      mapStyle="mapbox://styles/mapbox/dark-v11"
       onClick={onMapClick ? (e) => onMapClick(e) : undefined}
+      interactive={interactive}
+      attributionControl={false}
     >
       {markers.map((marker, index) => (
         <Marker
@@ -31,18 +46,12 @@ export default function MapComponent({ onMapClick, markers = [], answer }: MapCo
           latitude={marker.latitude}
           anchor="bottom"
         >
-          <MapPin className="w-6 h-6 text-blue-500" />
+          <MapPin 
+            className={`w-6 h-6 ${marker.color || 'text-blue-500'}`}
+            style={{ transform: 'translate(-50%, -100%)' }}
+          />
         </Marker>
       ))}
-      {answer && (
-        <Marker
-          longitude={answer.longitude}
-          latitude={answer.latitude}
-          anchor="bottom"
-        >
-          <MapPin className="w-6 h-6 text-green-500" />
-        </Marker>
-      )}
     </Map>
   );
 }
