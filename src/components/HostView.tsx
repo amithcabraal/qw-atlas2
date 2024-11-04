@@ -68,7 +68,7 @@ export default function HostView({
       const relevantAnswers = propAnswers.filter(a => a.question_id === currentQuestion);
       setDisplayedAnswers(relevantAnswers);
     } else {
-      setDisplayedAnswers([]);
+     // setDisplayedAnswers([]);
     }
   }, [propAnswers, showingAnswers, currentQuestion]);
 
