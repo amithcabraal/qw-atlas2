@@ -12,9 +12,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   db: {
     schema: 'public'
   },
-  global: {
-    headers: {
-      'x-my-custom-header': 'geoquiz-game'
+  realtime: {
+    params: {
+      eventsPerSecond: 10
     }
   }
 });
