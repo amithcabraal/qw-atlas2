@@ -54,7 +54,6 @@ export default function PlayGame() {
     }
 
     let mounted = true;
-    let gameChannel: any = null;
 
     const setupSubscriptions = async () => {
       try {
@@ -88,70 +87,21 @@ export default function PlayGame() {
           }
         }
 
-        // Set up real-time subscriptions
-        gameChannel = supabase.channel(`game:${gameId}`)
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'games',
-              filter: `id=eq.${gameId}`
-            },
-            (payload) => {
-              console.log('Game update:', payload);
-              if (mounted) {
-                setGame(payload.new as Game);
-              }
-            }
-          )
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'players',
-              filter: `game_id=eq.${gameId}`
-            },
-            (payload) => {
-              console.log('Players update:', payload);
-              if (!mounted) return;
+        // Fetch current answers if in revealing state
+        if (gameData.status === 'revealing') {
+          const { data: answersData } = await supabase
+            .from('answers')
+            .select('*')
+            .eq('game_id', gameId)
+            .eq('question_id', gameData.current_question);
 
-              if (payload.eventType === 'INSERT') {
-                setPlayers(current => [...current, payload.new as Player]);
-              } else if (payload.eventType === 'UPDATE') {
-                setPlayers(current =>
-                  current.map(p => p.id === payload.new.id ? payload.new as Player : p)
-                );
-                if (playerId && payload.new.id === playerId) {
-                  setCurrentPlayer(payload.new as Player);
-                }
-              }
-            }
-          )
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'answers',
-              filter: `game_id=eq.${gameId}`
-            },
-            (payload) => {
-              console.log('Answers update:', payload);
-              if (!mounted) return;
-              
-              if (payload.eventType === 'INSERT') {
-                setAnswers(current => [...current, payload.new as Answer]);
-              }
-            }
-          );
-
-        await gameChannel.subscribe();
-        console.log('All subscriptions established');
+          if (mounted && answersData) {
+            setAnswers(answersData);
+          }
+        }
 
       } catch (err) {
-        console.error('Error in setup:', err);
+        console.error('Error in initial data fetch:', err);
         if (mounted) {
           setError(err instanceof Error ? err.message : 'Failed to load game');
         }
@@ -162,14 +112,70 @@ export default function PlayGame() {
       }
     };
 
-    setupSubscriptions();
+    // Set up real-time subscriptions
+    const channel = supabase.channel(`game:${gameId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` },
+        (payload) => {
+          console.log('Game update:', payload);
+          if (mounted) {
+            setGame(payload.new as Game);
+            // Clear answers when moving to next question
+            if (payload.new.current_question !== payload.old?.current_question) {
+              setAnswers([]);
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` },
+        (payload) => {
+          console.log('Players update:', payload);
+          if (!mounted) return;
+
+          if (payload.eventType === 'INSERT') {
+            setPlayers(current => [...current, payload.new as Player]);
+          } else if (payload.eventType === 'UPDATE') {
+            setPlayers(current =>
+              current.map(p => p.id === payload.new.id ? payload.new as Player : p)
+            );
+            if (playerId && payload.new.id === playerId) {
+              setCurrentPlayer(payload.new as Player);
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'answers', filter: `game_id=eq.${gameId}` },
+        (payload) => {
+          console.log('Answers update:', payload);
+          if (!mounted) return;
+
+          if (payload.eventType === 'INSERT') {
+            setAnswers(current => [...current, payload.new as Answer]);
+          }
+        }
+      );
+
+    // Start subscriptions and initial data fetch
+    Promise.all([
+      channel.subscribe((status) => {
+        console.log('Channel status:', status);
+      }),
+      setupSubscriptions()
+    ]).catch(err => {
+      console.error('Error in setup:', err);
+      if (mounted) {
+        setError('Failed to initialize game');
+      }
+    });
 
     return () => {
       mounted = false;
-      if (gameChannel) {
-        console.log('Cleaning up subscriptions');
-        supabase.removeChannel(gameChannel);
-      }
+      supabase.removeChannel(channel);
     };
   }, [gameId, playerId]);
 
