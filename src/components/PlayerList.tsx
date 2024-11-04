@@ -16,6 +16,7 @@ interface PlayerListProps {
 
 export default function PlayerList({ players, showAnswered = false }: PlayerListProps) {
   if (!players || !Array.isArray(players)) {
+    console.log('Invalid players data:', players);
     return null;
   }
 
