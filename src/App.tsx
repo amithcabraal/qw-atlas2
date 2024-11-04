@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import HostGame from './pages/HostGame';
 import JoinGame from './pages/JoinGame';
+import JoinManual from './pages/JoinManual';
 import PlayGame from './pages/PlayGame';
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/host" element={<HostGame />} />
+          <Route path="/join" element={<JoinManual />} />
           <Route path="/join/:gameCode" element={<JoinGame />} />
           <Route path="/play/:gameId" element={<PlayGame />} />
         </Routes>
