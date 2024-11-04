@@ -89,35 +89,37 @@ export default function HostGame() {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'players',
           filter: `game_id=eq.${gameId}`
         },
         async (payload) => {
-          console.log('Received player change:', payload);
-          
-          // Fetch fresh player list on any change
-          const { data: updatedPlayers, error } = await supabase
-            .from('players')
-            .select('*')
-            .eq('game_id', gameId)
-            .order('created_at', { ascending: true });
-
-          if (error) {
-            console.error('Error fetching updated players:', error);
-            return;
-          }
-
-          if (updatedPlayers) {
-            console.log('Updated players list:', updatedPlayers);
-            setPlayers(updatedPlayers);
-          }
+          console.log('Received player insert:', payload);
+          const newPlayer = payload.new as Player;
+          setPlayers(current => [...current, newPlayer]);
         }
       )
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-      });
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'players',
+          filter: `game_id=eq.${gameId}`
+        },
+        async (payload) => {
+          console.log('Received player update:', payload);
+          const updatedPlayer = payload.new as Player;
+          setPlayers(current => 
+            current.map(p => p.id === updatedPlayer.id ? updatedPlayer : p)
+          );
+        }
+      );
+
+    channel.subscribe((status) => {
+      console.log('Subscription status:', status);
+    });
 
     return () => {
       console.log('Cleaning up subscription');
