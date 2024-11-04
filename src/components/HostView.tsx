@@ -56,21 +56,13 @@ export default function HostView({
     setIsRevealing(false);
   }, [currentQuestion]);
 
-  // Update displayed answers when answers prop changes or showing state changes
+  // Update displayed answers when answers prop changes and we're showing answers
   useEffect(() => {
-    console.log('Answers or showing state changed:', { 
-      showingAnswers, 
-      answersCount: propAnswers.length,
-      currentQuestion 
-    });
-    
     if (showingAnswers) {
-      // Filter answers for current question number
-      const relevantAnswers = propAnswers.filter(a => a.question_id === currentQuestion);
-      console.log('Setting displayed answers:', relevantAnswers);
-      setDisplayedAnswers(relevantAnswers);
+      console.log('Updating displayed answers:', propAnswers);
+      setDisplayedAnswers(propAnswers);
     }
-  }, [propAnswers, currentQuestion, showingAnswers]);
+  }, [propAnswers, showingAnswers]);
 
   // Prepare markers for the map
   const markers = showingAnswers ? [
