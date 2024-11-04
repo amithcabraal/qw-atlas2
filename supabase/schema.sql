@@ -1,7 +1,8 @@
 -- Enable real-time for required tables
 alter publication supabase_realtime add table players;
+alter publication supabase_realtime add table answers;
+alter publication supabase_realtime add table games;
 
--- Create tables for the GeoQuiz game
 create table if not exists games (
   id uuid default gen_random_uuid() primary key,
   code text not null unique,
