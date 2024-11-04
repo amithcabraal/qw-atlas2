@@ -57,29 +57,21 @@ export default function HostView({
   const question = questions[currentQuestion];
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
 
-  // Reset state when question changes
   useEffect(() => {
-    console.log('Question changed, resetting state');
     setShowingAnswers(false);
     setDisplayedAnswers([]);
     setIsRevealing(false);
   }, [currentQuestion]);
 
-  // Update displayed answers when answers prop changes or showing state changes
   useEffect(() => {
-    console.log('Answers prop changed:', propAnswers);
-    
     if (showingAnswers) {
-      // Only show answers for the current question
       const relevantAnswers = propAnswers.filter(a => a.question_id === currentQuestion);
-      console.log('Setting displayed answers:', relevantAnswers);
       setDisplayedAnswers(relevantAnswers);
     } else {
       setDisplayedAnswers([]);
     }
   }, [propAnswers, showingAnswers, currentQuestion]);
 
-  // Prepare markers for the map
   const markers = showingAnswers ? [
     { 
       latitude: question.latitude, 
@@ -95,36 +87,18 @@ export default function HostView({
         longitude: answer.longitude,
         color: 'text-red-500',
         fill: true,
-        label: player?.initials || 'Unknown'
+        label: `${player?.initials || 'Unknown'} (${answer.score} pts)`
       };
     })
   ] : [];
 
   const handleReveal = async () => {
-    if (isRevealing) return;
+    if (isRevealing || !allPlayersAnswered) return;
 
     try {
       setIsRevealing(true);
-      
-      // Update game status
-      onRevealAnswers();
-
-      // Fetch answers for current question
-      const { data: answersData, error: answersError } = await supabase
-        .from('answers')
-        .select('*')
-        .eq('game_id', gameId)
-        .eq('question_id', currentQuestion);
-
-      if (answersError) throw answersError;
-
-      console.log('Fetched answers on reveal:', answersData);
-      
-      // Update local state
+      await onRevealAnswers();
       setShowingAnswers(true);
-      if (answersData) {
-        setDisplayedAnswers(answersData);
-      }
     } catch (err) {
       console.error('Error revealing answers:', err);
     } finally {
@@ -147,8 +121,11 @@ export default function HostView({
             <button
               onClick={handleReveal}
               disabled={!allPlayersAnswered || showingAnswers || isRevealing}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 
-                       text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              className={`w-full py-3 px-4 ${
+                allPlayersAnswered && !showingAnswers
+                  ? 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-gray-600'
+              } text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2`}
             >
               <Eye className="w-5 h-5" />
               {isRevealing ? 'Revealing...' : 'Reveal Answers'}
@@ -166,7 +143,9 @@ export default function HostView({
           </div>
         </div>
         <div>
-          <h2 className="text-xl font-semibold text-white mb-4">Players</h2>
+          <h2 className="text-xl font-semibold text-white mb-4">
+            Players ({players.filter(p => p.has_answered).length}/{players.length} answered)
+          </h2>
           <PlayerList players={players} showAnswered={true} />
         </div>
       </div>
@@ -174,8 +153,8 @@ export default function HostView({
         <MapComponent 
           markers={markers} 
           interactive={true}
-          showLabels={true}
-          showMarkerLabels={true}
+          showLabels={showingAnswers}
+          showMarkerLabels={showingAnswers}
         />
       </div>
     </div>
