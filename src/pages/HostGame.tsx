@@ -1,34 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Share2, Play } from 'lucide-react';
+import { Play, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import PlayerList from '../components/PlayerList';
+import ShareButton from '../components/ShareButton';
 import { useSupabaseSubscription } from '../hooks/useSupabaseSubscription';
-import type { Player, Game } from '../types';
+import { useGameSharing } from '../hooks/useGameSharing';
+import type { Player } from '../types';
+
+function generateGameCode(): string {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
 
 export default function HostGame() {
   const navigate = useNavigate();
   const [gameCode, setGameCode] = useState<string>('');
   const [players, setPlayers] = useState<Player[]>([]);
   const [gameId, setGameId] = useState<string>('');
+  const [error, setError] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+  const { shareGame, copied } = useGameSharing();
 
   useEffect(() => {
     const createGame = async () => {
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const { data: game } = await supabase
-        .from('games')
-        .insert({
-          code,
-          status: 'waiting',
-          currentQuestion: 0,
-          hostId: crypto.randomUUID()
-        })
-        .select()
-        .single();
+      try {
+        setIsLoading(true);
+        const code = generateGameCode();
+        const hostId = crypto.randomUUID();
+        
+        const { data: game, error: insertError } = await supabase
+          .from('games')
+          .insert({
+            code,
+            status: 'waiting',
+            current_question: 0,
+            host_id: hostId
+          })
+          .select()
+          .single();
 
-      if (game) {
-        setGameCode(code);
-        setGameId(game.id);
+        if (insertError) {
+          throw insertError;
+        }
+
+        if (game) {
+          setGameCode(code);
+          setGameId(game.id);
+        } else {
+          throw new Error('Failed to create game');
+        }
+      } catch (err) {
+        setError('Failed to create game. Please try again.');
+        console.error('Error creating game:', err);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -36,7 +61,7 @@ export default function HostGame() {
   }, []);
 
   useSupabaseSubscription(
-    `game:${gameId}`,
+    gameId ? `game:${gameId}` : null,
     'player_joined',
     (payload) => {
       setPlayers((current) => [...current, payload.player]);
@@ -44,67 +69,83 @@ export default function HostGame() {
   );
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/join/${gameCode}`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Join my GeoQuiz game!',
-          text: `Join my game with code: ${gameCode}`,
-          url: shareUrl
-        });
-      } catch (error) {
-        console.error('Error sharing:', error);
-      }
-    } else {
-      await navigator.clipboard.writeText(shareUrl);
-      // Show toast notification (you might want to add a toast component)
+    if (!gameCode) {
+      setError('No game code available to share');
+      return;
     }
+    await shareGame(gameCode);
   };
 
   const startGame = async () => {
-    await supabase
-      .from('games')
-      .update({ status: 'playing' })
-      .eq('id', gameId);
+    if (!gameId) return;
     
-    navigate(`/play/${gameId}?role=host`);
+    try {
+      const { error: updateError } = await supabase
+        .from('games')
+        .update({ status: 'playing' })
+        .eq('id', gameId);
+
+      if (updateError) throw updateError;
+      
+      navigate(`/play/${gameId}?role=host`);
+    } catch (err) {
+      setError('Failed to start game. Please try again.');
+      console.error('Error starting game:', err);
+    }
   };
 
   return (
-    <div className="container mx-auto max-w-2xl p-4">
-      <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-xl">
-        <h1 className="text-3xl font-bold text-white mb-6">Host Game</h1>
-        
-        <div className="mb-8">
-          <div className="flex items-center justify-between bg-white/5 p-4 rounded-lg">
-            <div>
-              <p className="text-gray-300">Game Code:</p>
-              <p className="text-4xl font-mono font-bold text-white">{gameCode}</p>
-            </div>
-            <button
-              onClick={handleShare}
-              className="p-3 bg-blue-600 hover:bg-blue-700 rounded-full transition-colors"
-            >
-              <Share2 className="w-6 h-6 text-white" />
-            </button>
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="max-w-md w-full space-y-8">
+        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-8 shadow-xl">
+          <div className="text-center mb-8">
+            <Users className="mx-auto h-12 w-12 text-blue-400" />
+            <h1 className="mt-4 text-3xl font-bold text-white">Host Game</h1>
           </div>
-        </div>
 
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-white mb-4">Players ({players.length})</h2>
-          <PlayerList players={players} />
-        </div>
+          {error && (
+            <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-300">
+              {error}
+            </div>
+          )}
 
-        <button
-          onClick={startGame}
-          disabled={players.length === 0}
-          className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 
-                   text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-        >
-          <Play className="w-5 h-5" />
-          Start Game
-        </button>
+          <div className="mb-8">
+            <div className="bg-white/5 p-6 rounded-lg text-center">
+              <p className="text-gray-300 mb-2">Game Code:</p>
+              {isLoading ? (
+                <div className="animate-pulse">
+                  <div className="h-12 bg-white/10 rounded mb-4"></div>
+                </div>
+              ) : (
+                <p className="text-5xl font-mono font-bold text-white tracking-wider mb-4">
+                  {gameCode}
+                </p>
+              )}
+              <ShareButton 
+                onClick={handleShare} 
+                copied={copied} 
+                disabled={!gameCode || isLoading}
+              />
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-white mb-4">
+              Players ({players.length})
+            </h2>
+            <PlayerList players={players} />
+          </div>
+
+          <button
+            onClick={startGame}
+            disabled={players.length === 0 || !gameCode || isLoading}
+            className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 
+                     text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+          >
+            <Play className="w-5 h-5" />
+            Start Game ({players.length} {players.length === 1 ? 'player' : 'players'})
+          </button>
+        </div>
       </div>
     </div>
   );
