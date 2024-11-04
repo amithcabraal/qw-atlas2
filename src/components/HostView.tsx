@@ -48,15 +48,21 @@ export default function HostView({
   const question = questions[currentQuestion];
   const allPlayersAnswered = localPlayers.length > 0 && localPlayers.every(p => p.has_answered);
 
+  // Update local players when props change
   useEffect(() => {
     setLocalPlayers(players);
   }, [players]);
 
+  // Update current answers when answers prop changes or showing state changes
   useEffect(() => {
-    // Filter answers for current question only
-    setCurrentAnswers(answers.filter(a => a.question_id === question.id));
-  }, [answers, question.id]);
+    if (showingAnswers) {
+      const filteredAnswers = answers.filter(a => a.question_id === question.id);
+      console.log('Filtered answers for question', question.id, ':', filteredAnswers);
+      setCurrentAnswers(filteredAnswers);
+    }
+  }, [answers, question.id, showingAnswers]);
 
+  // Set up real-time subscriptions
   useEffect(() => {
     console.log('Setting up host view subscriptions');
     
@@ -92,7 +98,7 @@ export default function HostView({
         },
         (payload) => {
           console.log('Answer update received:', payload);
-          if (payload.eventType === 'INSERT' && payload.new.question_id === question.id) {
+          if (payload.eventType === 'INSERT' && payload.new.question_id === question.id && showingAnswers) {
             setCurrentAnswers(current => [...current, payload.new as Answer]);
           }
         }
@@ -106,21 +112,24 @@ export default function HostView({
       console.log('Cleaning up host view subscriptions');
       supabase.removeChannel(channel);
     };
-  }, [gameId, question.id]);
+  }, [gameId, question.id, showingAnswers]);
 
+  // Prepare markers for the map
   const markers = showingAnswers
     ? [
         { 
           latitude: question.latitude, 
           longitude: question.longitude, 
           color: 'text-green-500',
-          fill: true
+          fill: true,
+          label: 'Correct Location'
         },
         ...currentAnswers.map(answer => ({
           latitude: answer.latitude,
           longitude: answer.longitude,
           color: 'text-red-500',
-          fill: true
+          fill: true,
+          label: `${localPlayers.find(p => p.id === answer.player_id)?.initials || 'Unknown'}`
         }))
       ]
     : [];
@@ -131,7 +140,7 @@ export default function HostView({
     onNextQuestion();
   };
 
-  const handleReveal = () => {
+  const handleReveal = async () => {
     setShowingAnswers(true);
     onRevealAnswers();
   };
@@ -175,6 +184,7 @@ export default function HostView({
           markers={markers} 
           interactive={false}
           showLabels={false}
+          showMarkerLabels={true}
         />
       </div>
     </div>
