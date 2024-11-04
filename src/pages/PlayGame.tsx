@@ -148,8 +148,11 @@ export default function PlayGame() {
     if (!game || !gameId) return;
 
     try {
-      const nextQuestion = game.current_question + 1;
+      console.log("Current Question : ", game.current_question);
       
+      const nextQuestion = game.current_question + 1;
+      console.log("Increased question number is : ", game.current_question);      
+
       if (nextQuestion >= questions.length) {
         await supabase
           .from('games')
@@ -190,6 +193,9 @@ export default function PlayGame() {
         .eq('id', gameId);
 
       // Fetch answers for current question only
+
+      console.log("Looking for answers for question id : ", game.current_question);
+      
       const { data: answersData, error: answersError } = await supabase
         .from('answers')
         .select('*')
@@ -197,7 +203,7 @@ export default function PlayGame() {
         .eq('question_id', game.current_question);
 
       if (answersError) throw answersError;
-      console.log('Fetched answers:', answersData);
+      console.log('Fetched answers for that question:', answersData);
 
       if (answersData) {
         setAnswers(answersData);
