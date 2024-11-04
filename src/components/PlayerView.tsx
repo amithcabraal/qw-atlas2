@@ -25,17 +25,18 @@ export default function PlayerView({
   gameId,
   playerId,
   question,
-  hasAnswered
+  hasAnswered: initialHasAnswered
 }: PlayerViewProps) {
   const [selectedLocation, setSelectedLocation] = useState<[number, number] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasAnswered, setHasAnswered] = useState(initialHasAnswered);
 
-  // Reset selected location when question changes
   useEffect(() => {
     setSelectedLocation(null);
     setError(null);
-  }, [question.id]);
+    setHasAnswered(initialHasAnswered);
+  }, [question.id, initialHasAnswered]);
 
   const handleMapClick = (e: MapLayerMouseEvent) => {
     if (hasAnswered || isSubmitting) return;
@@ -64,7 +65,6 @@ export default function PlayerView({
         question.longitude
       );
 
-      // Calculate score based on distance (max 1000 points, minimum 0)
       const score = Math.max(0, Math.floor(1000 * Math.exp(-distance / 1000)));
 
       // First submit answer
@@ -82,25 +82,21 @@ export default function PlayerView({
 
       if (answerError) throw answerError;
 
-      // Then update player status
+      // Then update player status and score
       const { error: playerError } = await supabase
         .from('players')
         .update({ 
           has_answered: true,
-          score: score 
+          score: supabase.sql`score + ${score}`
         })
         .eq('id', playerId);
 
       if (playerError) throw playerError;
 
+      setHasAnswered(true);
     } catch (err) {
       console.error('Error submitting answer:', err);
       setError('Failed to submit answer. Please try again.');
-      // Revert player status if answer submission fails
-      await supabase
-        .from('players')
-        .update({ has_answered: false })
-        .eq('id', playerId);
     } finally {
       setIsSubmitting(false);
     }
@@ -112,7 +108,12 @@ export default function PlayerView({
       <div className="h-[400px] rounded-xl overflow-hidden">
         <MapComponent
           onMapClick={hasAnswered ? undefined : handleMapClick}
-          markers={selectedLocation ? [{ longitude: selectedLocation[0], latitude: selectedLocation[1] }] : []}
+          markers={selectedLocation ? [{ 
+            longitude: selectedLocation[0], 
+            latitude: selectedLocation[1],
+            color: 'text-blue-500',
+            fill: true
+          }] : []}
           showLabels={false}
         />
       </div>
