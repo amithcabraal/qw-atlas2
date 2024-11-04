@@ -56,10 +56,10 @@ export default function HostView({
     setIsRevealing(false);
   }, [currentQuestion]);
 
-  // Update displayed answers when answers prop changes and we're showing answers
+  // Update displayed answers when answers prop changes
   useEffect(() => {
+    console.log('Answers prop changed:', propAnswers);
     if (showingAnswers) {
-      console.log('Updating displayed answers:', propAnswers);
       setDisplayedAnswers(propAnswers);
     }
   }, [propAnswers, showingAnswers]);
@@ -90,12 +90,11 @@ export default function HostView({
 
     try {
       setIsRevealing(true);
-      setShowingAnswers(true);
       
-      // Notify parent to update game status
+      // First update game status
       onRevealAnswers();
 
-      // Fetch answers directly
+      // Then fetch answers for current question
       const { data: answersData, error: answersError } = await supabase
         .from('answers')
         .select('*')
@@ -104,13 +103,17 @@ export default function HostView({
 
       if (answersError) throw answersError;
 
+      console.log('Fetched answers:', answersData);
+      
+      // Update local state
+      setShowingAnswers(true);
       if (answersData) {
-        console.log('Fetched answers on reveal:', answersData);
         setDisplayedAnswers(answersData);
       }
     } catch (err) {
       console.error('Error revealing answers:', err);
       setShowingAnswers(false);
+      setDisplayedAnswers([]);
     } finally {
       setIsRevealing(false);
     }
