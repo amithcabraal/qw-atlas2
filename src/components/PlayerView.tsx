@@ -73,7 +73,7 @@ export default function PlayerView({
         .insert({
           player_id: playerId,
           game_id: gameId,
-          question_id: question.id, // Use question.id instead of index
+          question_id: question.id,
           latitude,
           longitude,
           distance,
