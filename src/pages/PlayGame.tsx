@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { questions } from '../data/questions';
 import HostView from '../components/HostView';
@@ -35,6 +35,7 @@ interface Answer {
 export default function PlayGame() {
   const { gameId } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const role = searchParams.get('role');
   const playerId = searchParams.get('playerId');
 
@@ -43,6 +44,7 @@ export default function PlayGame() {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchGameData = async () => {
@@ -58,7 +60,6 @@ export default function PlayGame() {
           .single();
 
         if (gameError) throw gameError;
-        console.log('Game data loaded:', gameData);
         setGame(gameData);
 
         // Fetch players
@@ -68,7 +69,6 @@ export default function PlayGame() {
           .eq('game_id', gameId);
 
         if (playersError) throw playersError;
-        console.log('Players loaded:', playersData);
         setPlayers(playersData || []);
 
         if (playerId) {
@@ -101,16 +101,18 @@ export default function PlayGame() {
             },
             (payload) => {
               console.log('Players update:', payload);
-              setPlayers(current => {
-                const updated = [...current];
-                const index = updated.findIndex(p => p.id === payload.new.id);
-                if (index >= 0) {
-                  updated[index] = payload.new;
-                } else {
-                  updated.push(payload.new);
+              if (payload.eventType === 'UPDATE') {
+                setPlayers(current => 
+                  current.map(p => 
+                    p.id === payload.new.id ? payload.new : p
+                  )
+                );
+                if (playerId && payload.new.id === playerId) {
+                  setCurrentPlayer(payload.new);
                 }
-                return updated;
-              });
+              } else if (payload.eventType === 'INSERT') {
+                setPlayers(current => [...current, payload.new]);
+              }
             }
           )
           .on(
@@ -129,13 +131,11 @@ export default function PlayGame() {
             }
           );
 
-        gameChannel.subscribe((status) => {
-          console.log('Channel status:', status);
-        });
+        gameChannel.subscribe();
 
-        console.log('All subscriptions established');
       } catch (err) {
         console.error('Error fetching game data:', err);
+        setError('Failed to load game data');
       } finally {
         setLoading(false);
       }
@@ -148,15 +148,15 @@ export default function PlayGame() {
     if (!game || !gameId) return;
 
     try {
-      console.log("Current Question : ", game.current_question);
-      
       const nextQuestion = game.current_question + 1;
-      console.log("Increased question number is : ", game.current_question);      
-
+      
       if (nextQuestion >= questions.length) {
         await supabase
           .from('games')
-          .update({ status: 'finished' })
+          .update({ 
+            status: 'finished',
+            current_question: questions.length - 1
+          })
           .eq('id', gameId);
       } else {
         // Clear answers first
@@ -179,6 +179,7 @@ export default function PlayGame() {
       }
     } catch (err) {
       console.error('Error advancing to next question:', err);
+      setError('Failed to advance to next question');
     }
   };
 
@@ -192,10 +193,7 @@ export default function PlayGame() {
         .update({ status: 'revealing' })
         .eq('id', gameId);
 
-      // Fetch answers for current question only
-
-      console.log("Looking for answers for question id : ", game.current_question);
-      
+      // Fetch all answers for current question
       const { data: answersData, error: answersError } = await supabase
         .from('answers')
         .select('*')
@@ -203,13 +201,13 @@ export default function PlayGame() {
         .eq('question_id', game.current_question);
 
       if (answersError) throw answersError;
-      console.log('Fetched answers for that question:', answersData);
 
       if (answersData) {
         setAnswers(answersData);
       }
     } catch (err) {
       console.error('Error revealing answers:', err);
+      setError('Failed to reveal answers');
     }
   };
 
@@ -221,10 +219,42 @@ export default function PlayGame() {
     );
   }
 
-  if (!game || !questions[game.current_question]) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-white text-xl">Game not found or invalid state</div>
+        <div className="text-red-400 text-xl">{error}</div>
+      </div>
+    );
+  }
+
+  if (!game) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-white text-xl">Game not found</div>
+      </div>
+    );
+  }
+
+  if (game.status === 'finished') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-xl p-8 shadow-xl">
+          <h1 className="text-3xl font-bold text-white text-center mb-6">Game Complete!</h1>
+          <PlayerList 
+            players={players} 
+            isGameComplete={true}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const currentQuestionData = questions[game.current_question];
+  
+  if (!currentQuestionData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-white text-xl">Invalid question state</div>
       </div>
     );
   }
@@ -232,7 +262,7 @@ export default function PlayGame() {
   if (role === 'host') {
     return (
       <HostView
-        gameId={gameId!}
+        gameId={gameId}
         currentQuestion={game.current_question}
         players={players}
         answers={answers}
@@ -245,9 +275,9 @@ export default function PlayGame() {
   if (role === 'player' && currentPlayer) {
     return (
       <PlayerView
-        gameId={gameId!}
+        gameId={gameId}
         playerId={currentPlayer.id}
-        question={questions[game.current_question]}
+        question={currentQuestionData}
         hasAnswered={currentPlayer.has_answered}
       />
     );
