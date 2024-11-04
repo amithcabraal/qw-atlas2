@@ -43,60 +43,55 @@ export default function HostView({
   onRevealAnswers
 }: HostViewProps) {
   const [showingAnswers, setShowingAnswers] = useState(false);
-  const [localPlayers, setLocalPlayers] = useState<Player[]>(players);
   const [currentAnswers, setCurrentAnswers] = useState<Answer[]>([]);
   const question = questions[currentQuestion];
-  const allPlayersAnswered = localPlayers.length > 0 && localPlayers.every(p => p.has_answered);
+  const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
 
-  // Update local players when props change
-  useEffect(() => {
-    setLocalPlayers(players);
-  }, [players]);
-
-  // Update current answers when props change
+  // Update current answers when answers prop changes and we're showing answers
   useEffect(() => {
     if (showingAnswers) {
       const relevantAnswers = propAnswers.filter(a => a.question_id === question.id);
-      console.log('Updating current answers:', relevantAnswers);
+      console.log('Setting current answers:', relevantAnswers);
       setCurrentAnswers(relevantAnswers);
     }
   }, [propAnswers, question.id, showingAnswers]);
 
-  // Prepare markers for the map
-  const markers = showingAnswers
-    ? [
-        { 
-          latitude: question.latitude, 
-          longitude: question.longitude, 
-          color: 'text-green-500',
-          fill: true,
-          label: 'Correct Location'
-        },
-        ...currentAnswers.map(answer => {
-          const player = localPlayers.find(p => p.id === answer.player_id);
-          return {
-            latitude: answer.latitude,
-            longitude: answer.longitude,
-            color: 'text-red-500',
-            fill: true,
-            label: player?.initials || 'Unknown'
-          };
-        })
-      ]
-    : [];
-
-  const handleNext = () => {
+  // Clear answers when question changes
+  useEffect(() => {
     setShowingAnswers(false);
     setCurrentAnswers([]);
+  }, [currentQuestion]);
+
+  // Prepare markers for the map
+  const markers = showingAnswers ? [
+    { 
+      latitude: question.latitude, 
+      longitude: question.longitude, 
+      color: 'text-green-500',
+      fill: true,
+      label: 'Correct Location'
+    },
+    ...currentAnswers.map(answer => {
+      const player = players.find(p => p.id === answer.player_id);
+      return {
+        latitude: answer.latitude,
+        longitude: answer.longitude,
+        color: 'text-red-500',
+        fill: true,
+        label: player?.initials || 'Unknown'
+      };
+    })
+  ] : [];
+
+  const handleNext = () => {
     onNextQuestion();
   };
 
   const handleReveal = async () => {
     try {
-      // Set state first
       setShowingAnswers(true);
-      
-      // Fetch all answers for the current question
+      onRevealAnswers();
+
       const { data: answersData, error: answersError } = await supabase
         .from('answers')
         .select('*')
@@ -109,9 +104,6 @@ export default function HostView({
         console.log('Fetched answers on reveal:', answersData);
         setCurrentAnswers(answersData);
       }
-
-      // Notify parent
-      onRevealAnswers();
     } catch (err) {
       console.error('Error revealing answers:', err);
       setShowingAnswers(false);
@@ -147,9 +139,9 @@ export default function HostView({
         </div>
         <div>
           <h2 className="text-xl font-semibold text-white mb-4">
-            Players ({localPlayers.length})
+            Players ({players.length})
           </h2>
-          <PlayerList players={localPlayers} showAnswered={true} />
+          <PlayerList players={players} showAnswered={true} />
         </div>
       </div>
       <div className="h-[400px] rounded-xl overflow-hidden">
