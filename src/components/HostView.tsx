@@ -43,11 +43,18 @@ export default function HostView({
   onRevealAnswers
 }: HostViewProps) {
   const [showingAnswers, setShowingAnswers] = useState(false);
+  const [localPlayers, setLocalPlayers] = useState<Player[]>(players);
   const question = questions[currentQuestion];
-  const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
+  const allPlayersAnswered = localPlayers.length > 0 && localPlayers.every(p => p.has_answered);
 
   useEffect(() => {
-    const channel = supabase.channel(`game-updates-${gameId}`)
+    setLocalPlayers(players);
+  }, [players]);
+
+  useEffect(() => {
+    console.log('Setting up host view subscriptions');
+    
+    const channel = supabase.channel(`host-view-${gameId}`)
       .on(
         'postgres_changes',
         {
@@ -58,6 +65,15 @@ export default function HostView({
         },
         (payload) => {
           console.log('Player update received:', payload);
+          if (payload.eventType === 'UPDATE') {
+            setLocalPlayers(current => 
+              current.map(p => 
+                p.id === payload.new.id ? { ...p, ...payload.new } : p
+              )
+            );
+          } else if (payload.eventType === 'INSERT') {
+            setLocalPlayers(current => [...current, payload.new as Player]);
+          }
         }
       )
       .on(
@@ -78,6 +94,7 @@ export default function HostView({
     });
 
     return () => {
+      console.log('Cleaning up host view subscriptions');
       supabase.removeChannel(channel);
     };
   }, [gameId]);
@@ -136,9 +153,9 @@ export default function HostView({
         </div>
         <div>
           <h2 className="text-xl font-semibold text-white mb-4">
-            Players ({players.length})
+            Players ({localPlayers.length})
           </h2>
-          <PlayerList players={players} showAnswered={true} />
+          <PlayerList players={localPlayers} showAnswered={true} />
         </div>
       </div>
       <div className="h-[400px] rounded-xl overflow-hidden">
