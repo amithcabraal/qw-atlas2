@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapLayerMouseEvent } from 'react-map-gl';
 import QuestionCard from './QuestionCard';
 import MapComponent from './MapComponent';
@@ -29,6 +29,11 @@ export default function PlayerView({
 }: PlayerViewProps) {
   const [selectedLocation, setSelectedLocation] = useState<[number, number] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reset selected location when question changes
+  useEffect(() => {
+    setSelectedLocation(null);
+  }, [question.id]);
 
   const handleMapClick = (e: MapLayerMouseEvent) => {
     if (hasAnswered || isSubmitting) return;
