@@ -44,12 +44,18 @@ export default function HostView({
 }: HostViewProps) {
   const [showingAnswers, setShowingAnswers] = useState(false);
   const [localPlayers, setLocalPlayers] = useState<Player[]>(players);
+  const [currentAnswers, setCurrentAnswers] = useState<Answer[]>([]);
   const question = questions[currentQuestion];
   const allPlayersAnswered = localPlayers.length > 0 && localPlayers.every(p => p.has_answered);
 
   useEffect(() => {
     setLocalPlayers(players);
   }, [players]);
+
+  useEffect(() => {
+    // Filter answers for current question only
+    setCurrentAnswers(answers.filter(a => a.question_id === question.id));
+  }, [answers, question.id]);
 
   useEffect(() => {
     console.log('Setting up host view subscriptions');
@@ -86,6 +92,9 @@ export default function HostView({
         },
         (payload) => {
           console.log('Answer update received:', payload);
+          if (payload.eventType === 'INSERT' && payload.new.question_id === question.id) {
+            setCurrentAnswers(current => [...current, payload.new as Answer]);
+          }
         }
       );
 
@@ -97,31 +106,34 @@ export default function HostView({
       console.log('Cleaning up host view subscriptions');
       supabase.removeChannel(channel);
     };
-  }, [gameId]);
+  }, [gameId, question.id]);
 
   const markers = showingAnswers
     ? [
         { 
           latitude: question.latitude, 
           longitude: question.longitude, 
-          color: 'text-green-500' 
+          color: 'text-green-500',
+          fill: true
         },
-        ...answers.map(answer => ({
+        ...currentAnswers.map(answer => ({
           latitude: answer.latitude,
           longitude: answer.longitude,
-          color: 'text-red-500'
+          color: 'text-red-500',
+          fill: true
         }))
       ]
     : [];
 
+  const handleNext = () => {
+    setShowingAnswers(false);
+    setCurrentAnswers([]);
+    onNextQuestion();
+  };
+
   const handleReveal = () => {
     setShowingAnswers(true);
     onRevealAnswers();
-  };
-
-  const handleNext = () => {
-    setShowingAnswers(false);
-    onNextQuestion();
   };
 
   return (
