@@ -1,155 +1,75 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Eye } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import QuestionCard from './QuestionCard';
-import PlayerList from './PlayerList';
-import MapComponent from './MapComponent';
-import { questions } from '../data/questions';
-
-interface Question {
-  id: number;
-  text: string;
-  latitude: number;
-  longitude: number;
-  image?: string;
-  hint?: string;
-}
+import React from 'react';
+import { User, CheckCircle2, Trophy } from 'lucide-react';
 
 interface Player {
   id: string;
   initials: string;
-  game_id: string;
   score: number;
   has_answered: boolean;
-}
-
-interface Answer {
-  id: string;
-  player_id: string;
   game_id: string;
-  question_id: number;
-  latitude: number;
-  longitude: number;
-  distance: number;
-  score: number;
+  lastScore?: number;
 }
 
-interface HostViewProps {
-  gameId: string;
-  currentQuestion: number;
+interface PlayerListProps {
   players: Player[];
-  answers: Answer[];
-  onNextQuestion: () => void;
-  onRevealAnswers: () => void;
+  showAnswered?: boolean;
+  isGameComplete?: boolean;
 }
 
-export default function HostView({
-  gameId,
-  currentQuestion,
-  players,
-  answers: propAnswers,
-  onNextQuestion,
-  onRevealAnswers
-}: HostViewProps) {
-  const [showingAnswers, setShowingAnswers] = useState(false);
-  const [displayedAnswers, setDisplayedAnswers] = useState<Answer[]>([]);
-  const [isRevealing, setIsRevealing] = useState(false);
-  const question = questions[currentQuestion];
-  const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
-
-  useEffect(() => {
-    setShowingAnswers(false);
-    setDisplayedAnswers([]);
-    setIsRevealing(false);
-  }, [currentQuestion]);
-
-  useEffect(() => {
-    if (showingAnswers) {
-      const relevantAnswers = propAnswers.filter(a => a.question_id === currentQuestion);
-      setDisplayedAnswers(relevantAnswers);
-    }
-  }, [propAnswers, showingAnswers, currentQuestion]);
-
-  // Auto-reveal answers when all players have submitted
-  useEffect(() => {
-    if (allPlayersAnswered && !showingAnswers && !isRevealing) {
-      handleReveal();
-    }
-  }, [allPlayersAnswered]);
-
-  const markers = showingAnswers ? [
-    { 
-      latitude: question.latitude, 
-      longitude: question.longitude, 
-      color: 'text-green-500',
-      fill: true,
-      label: 'Correct Location'
-    },
-    ...displayedAnswers.map(answer => {
-      const player = players.find(p => p.id === answer.player_id);
-      return {
-        latitude: answer.latitude,
-        longitude: answer.longitude,
-        color: 'text-red-500',
-        fill: true,
-        label: `${player?.initials || 'Unknown'} (${answer.score} pts)`
-      };
-    })
-  ] : [];
-
-  const handleReveal = async () => {
-    if (isRevealing || !allPlayersAnswered) return;
-
-    try {
-      setIsRevealing(true);
-      await onRevealAnswers();
-      setShowingAnswers(true);
-    } catch (err) {
-      console.error('Error revealing answers:', err);
-    } finally {
-      setIsRevealing(false);
-    }
-  };
-
-  const handleNext = () => {
-    setShowingAnswers(false);
-    setDisplayedAnswers([]);
-    onNextQuestion();
-  };
+export default function PlayerList({ 
+  players, 
+  showAnswered = false,
+  isGameComplete = false 
+}: PlayerListProps) {
+  const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+  const winner = isGameComplete ? sortedPlayers[0] : null;
 
   return (
-    <div className="container mx-auto max-w-4xl p-4 space-y-6">
-      <div className="grid md:grid-cols-2 gap-6">
-        <div>
-          <QuestionCard question={question} showHint={true} />
-          <div className="mt-4 space-y-4">
-            {showingAnswers && (
-              <button
-                onClick={handleNext}
-                className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 
-                         text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                <Play className="w-5 h-5" />
-                Next Question
-              </button>
+    <div className="space-y-2">
+      {sortedPlayers.map((player, index) => (
+        <div
+          key={player.id}
+          className={`flex items-center justify-between p-3 rounded-lg
+            ${winner?.id === player.id 
+              ? 'bg-yellow-500/20 border border-yellow-500/50' 
+              : 'bg-white/10'}`}
+        >
+          <div className="flex items-center gap-2">
+            {isGameComplete && index === 0 && (
+              <Trophy className="w-5 h-5 text-yellow-400" />
             )}
+            <User className="w-5 h-5 text-gray-300" />
+            <span className="font-medium text-white">{player.initials}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {showAnswered && (
+              <CheckCircle2 
+                className={`w-5 h-5 ${
+                  player.has_answered ? 'text-green-400' : 'text-gray-400'
+                }`} 
+              />
+            )}
+            <div className="text-right">
+              <span className="font-mono text-white">{player.score}</span>
+              {player.lastScore !== undefined && player.score > player.lastScore && (
+                <span className="font-mono text-green-400 text-sm ml-1">
+                  +{player.score - player.lastScore}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-        <div>
-          <h2 className="text-xl font-semibold text-white mb-4">
-            Players ({players.filter(p => p.has_answered).length}/{players.length} answered)
-          </h2>
-          <PlayerList players={players} showAnswered={true} />
+      ))}
+      {isGameComplete && winner && (
+        <div className="mt-6 text-center bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4">
+          <h3 className="text-xl font-bold text-white mb-2">
+            🎉 {winner.initials} Wins! 🎉
+          </h3>
+          <p className="text-yellow-300">
+            Final Score: {winner.score} points
+          </p>
         </div>
-      </div>
-      <div className="h-[400px] rounded-xl overflow-hidden">
-        <MapComponent 
-          markers={markers} 
-          interactive={true}
-          showLabels={showingAnswers}
-          showMarkerLabels={showingAnswers}
-        />
-      </div>
+      )}
     </div>
   );
 }
