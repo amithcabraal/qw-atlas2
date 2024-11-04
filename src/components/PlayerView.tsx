@@ -40,13 +40,15 @@ interface PlayerViewProps {
   playerId: string;
   question: Question;
   hasAnswered: boolean;
+  gameStatus: 'waiting' | 'playing' | 'revealing' | 'finished';
 }
 
 export default function PlayerView({
   gameId,
   playerId,
   question,
-  hasAnswered: initialHasAnswered
+  hasAnswered: initialHasAnswered,
+  gameStatus
 }: PlayerViewProps) {
   const [selectedLocation, setSelectedLocation] = useState<[number, number] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,19 +56,22 @@ export default function PlayerView({
   const [hasAnswered, setHasAnswered] = useState(initialHasAnswered);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [players, setPlayers] = useState<Record<string, Player>>({});
-  const [isRevealing, setIsRevealing] = useState(false);
+  const [isRevealing, setIsRevealing] = useState(gameStatus === 'revealing');
   const [currentQuestionId, setCurrentQuestionId] = useState(question.id);
   const mapRef = useRef<any>(null);
 
-  // Handle question changes
+  // Handle question changes and game status updates
   useEffect(() => {
-    if (question.id !== currentQuestionId) {
+    const questionChanged = question.id !== currentQuestionId;
+    const statusChanged = isRevealing !== (gameStatus === 'revealing');
+
+    if (questionChanged || statusChanged) {
       setCurrentQuestionId(question.id);
       setSelectedLocation(null);
       setError(null);
       setHasAnswered(initialHasAnswered);
       setAnswers([]);
-      setIsRevealing(false);
+      setIsRevealing(gameStatus === 'revealing');
       
       // Reset map view
       if (mapRef.current) {
@@ -76,51 +81,13 @@ export default function PlayerView({
           duration: 1000
         });
       }
+
+      // If we're revealing answers, fetch them
+      if (gameStatus === 'revealing') {
+        fetchAnswers();
+      }
     }
-  }, [question.id, currentQuestionId, initialHasAnswered]);
-
-  // Subscribe to game status changes
-  useEffect(() => {
-    const channel = supabase.channel(`game-${gameId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'games',
-          filter: `id=eq.${gameId}`
-        },
-        async (payload: { new: Game }) => {
-          const newGame = payload.new;
-          
-          if (newGame.status === 'revealing') {
-            setIsRevealing(true);
-            await fetchAnswers();
-          } else if (newGame.status === 'playing') {
-            // Reset state for new question
-            setSelectedLocation(null);
-            setError(null);
-            setHasAnswered(false);
-            setAnswers([]);
-            setIsRevealing(false);
-            
-            // Reset map view
-            if (mapRef.current) {
-              mapRef.current.flyTo({
-                center: [0, 20],
-                zoom: 1.5,
-                duration: 1000
-              });
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [gameId]);
+  }, [question.id, currentQuestionId, initialHasAnswered, gameStatus, isRevealing]);
 
   const fetchAnswers = async () => {
     try {
