@@ -27,7 +27,6 @@ export default function HostGame() {
   const [isLoading, setIsLoading] = useState(true);
   const { shareGame, copied } = useGameSharing();
 
-  // Create game and set up initial state
   useEffect(() => {
     const createGame = async () => {
       try {
@@ -51,6 +50,16 @@ export default function HostGame() {
         if (game) {
           setGameCode(code);
           setGameId(game.id);
+          
+          // Immediately fetch any existing players
+          const { data: existingPlayers } = await supabase
+            .from('players')
+            .select('*')
+            .eq('game_id', game.id);
+            
+          if (existingPlayers) {
+            setPlayers(existingPlayers);
+          }
         } else {
           throw new Error('Failed to create game');
         }
@@ -65,56 +74,49 @@ export default function HostGame() {
     createGame();
   }, []);
 
-  // Set up real-time subscription and load initial players
   useEffect(() => {
     if (!gameId) return;
 
-    // Load initial players
-    const loadPlayers = async () => {
-      const { data: existingPlayers, error: playersError } = await supabase
-        .from('players')
-        .select('*')
-        .eq('game_id', gameId);
+    console.log('Setting up subscription for game:', gameId);
 
-      if (playersError) {
-        console.error('Error loading players:', playersError);
-        return;
-      }
+    const channel = supabase.channel(`game-${gameId}`, {
+      config: {
+        broadcast: { self: true },
+        presence: { key: 'host' },
+      },
+    });
 
-      if (existingPlayers) {
-        setPlayers(existingPlayers);
-      }
-    };
+    const subscription = channel
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'players',
+          filter: `game_id=eq.${gameId}`,
+        },
+        async (payload) => {
+          console.log('Received player update:', payload);
 
-    loadPlayers();
+          // Fetch all players again to ensure consistency
+          const { data: updatedPlayers } = await supabase
+            .from('players')
+            .select('*')
+            .eq('game_id', gameId);
 
-    // Set up real-time subscription
-    const playersSubscription = supabase
-      .channel(`players:${gameId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'players',
-        filter: `game_id=eq.${gameId}`
-      }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setPlayers(current => [...current, payload.new as Player]);
-        } else if (payload.eventType === 'UPDATE') {
-          setPlayers(current =>
-            current.map(player =>
-              player.id === payload.new.id ? { ...player, ...payload.new } : player
-            )
-          );
-        } else if (payload.eventType === 'DELETE') {
-          setPlayers(current =>
-            current.filter(player => player.id !== payload.old.id)
-          );
+          if (updatedPlayers) {
+            console.log('Updated players list:', updatedPlayers);
+            setPlayers(updatedPlayers);
+          }
         }
-      })
-      .subscribe();
+      )
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
 
     return () => {
-      playersSubscription.unsubscribe();
+      console.log('Cleaning up subscription');
+      subscription.unsubscribe();
     };
   }, [gameId]);
 
