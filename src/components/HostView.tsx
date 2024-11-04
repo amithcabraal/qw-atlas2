@@ -56,6 +56,7 @@ export default function HostView({
   const [displayedAnswers, setDisplayedAnswers] = useState<Answer[]>([]);
   const [isRevealing, setIsRevealing] = useState(false);
   const [playersWithScores, setPlayersWithScores] = useState<Player[]>(players);
+  const [error, setError] = useState<string | null>(null);
   
   const question = questions[currentQuestion];
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
@@ -65,6 +66,7 @@ export default function HostView({
     setShowingAnswers(false);
     setDisplayedAnswers([]);
     setIsRevealing(false);
+    setError(null);
     // Store current scores as lastScore when moving to next question
     setPlayersWithScores(players.map(player => ({
       ...player,
@@ -119,12 +121,24 @@ export default function HostView({
 
     try {
       setIsRevealing(true);
+      setError(null);
       await onRevealAnswers();
       setShowingAnswers(true);
     } catch (err) {
       console.error('Error revealing answers:', err);
+      setError('Failed to reveal answers');
     } finally {
       setIsRevealing(false);
+    }
+  };
+
+  const handleNext = async () => {
+    try {
+      setError(null);
+      await onNextQuestion();
+    } catch (err) {
+      console.error('Error moving to next question:', err);
+      setError('Failed to move to next question');
     }
   };
 
@@ -138,6 +152,11 @@ export default function HostView({
 
   return (
     <div className="container mx-auto max-w-4xl p-4 space-y-6">
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-300">
+          {error}
+        </div>
+      )}
       <div className="grid md:grid-cols-2 gap-6">
         <div>
           <QuestionCard question={question} showHint={true} />
