@@ -6,7 +6,14 @@ import PlayerList from '../components/PlayerList';
 import ShareButton from '../components/ShareButton';
 import { useSupabaseSubscription } from '../hooks/useSupabaseSubscription';
 import { useGameSharing } from '../hooks/useGameSharing';
-import type { Player } from '../types';
+
+interface Player {
+  id: string;
+  initials: string;
+  game_id: string;
+  score: number;
+  has_answered: boolean;
+}
 
 function generateGameCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -39,19 +46,36 @@ export default function HostGame() {
           .select()
           .single();
 
-        if (insertError) {
-          throw insertError;
-        }
+        if (insertError) throw insertError;
 
         if (game) {
           setGameCode(code);
           setGameId(game.id);
+
+          // Set up real-time subscription for players
+          const playersSubscription = supabase
+            .channel(`players:${game.id}`)
+            .on('postgres_changes', {
+              event: '*',
+              schema: 'public',
+              table: 'players',
+              filter: `game_id=eq.${game.id}`
+            }, (payload) => {
+              if (payload.eventType === 'INSERT') {
+                setPlayers(current => [...current, payload.new as Player]);
+              }
+            })
+            .subscribe();
+
+          return () => {
+            playersSubscription.unsubscribe();
+          };
         } else {
           throw new Error('Failed to create game');
         }
       } catch (err) {
-        setError('Failed to create game. Please try again.');
         console.error('Error creating game:', err);
+        setError('Failed to create game. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -59,14 +83,6 @@ export default function HostGame() {
 
     createGame();
   }, []);
-
-  useSupabaseSubscription(
-    gameId ? `game:${gameId}` : null,
-    'player_joined',
-    (payload) => {
-      setPlayers((current) => [...current, payload.player]);
-    }
-  );
 
   const handleShare = async () => {
     if (!gameCode) {
@@ -89,8 +105,8 @@ export default function HostGame() {
       
       navigate(`/play/${gameId}?role=host`);
     } catch (err) {
-      setError('Failed to start game. Please try again.');
       console.error('Error starting game:', err);
+      setError('Failed to start game. Please try again.');
     }
   };
 
