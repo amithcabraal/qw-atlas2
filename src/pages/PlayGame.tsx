@@ -118,10 +118,15 @@ export default function PlayGame() {
     };
 
     // Set up real-time subscriptions
-    const gameChannel = supabase.channel(`game:${gameId}`)
+    const channel = supabase.channel(`game:${gameId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` },
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'games',
+          filter: `id=eq.${gameId}` 
+        },
         (payload) => {
           console.log('Game update:', payload);
           if (mounted) {
@@ -135,7 +140,12 @@ export default function PlayGame() {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` },
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'players',
+          filter: `game_id=eq.${gameId}` 
+        },
         (payload) => {
           console.log('Players update:', payload);
           if (!mounted) return;
@@ -144,19 +154,22 @@ export default function PlayGame() {
             setPlayers(current => [...current, payload.new as Player]);
           } else if (payload.eventType === 'UPDATE') {
             setPlayers(current =>
-              current.map(p => p.id === payload.new.id ? payload.new as Player : p)
+              current.map(p => p.id === payload.new.id ? { ...payload.new as Player } : p)
             );
             if (playerId && payload.new.id === playerId) {
               setCurrentPlayer(payload.new as Player);
             }
           }
         }
-      );
-
-    const answersChannel = supabase.channel(`answers:${gameId}`)
+      )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'answers', filter: `game_id=eq.${gameId}` },
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'answers',
+          filter: `game_id=eq.${gameId}` 
+        },
         (payload) => {
           console.log('Answers update:', payload);
           if (!mounted) return;
@@ -169,11 +182,8 @@ export default function PlayGame() {
 
     // Start subscriptions and initial data fetch
     Promise.all([
-      gameChannel.subscribe((status) => {
-        console.log('Game channel status:', status);
-      }),
-      answersChannel.subscribe((status) => {
-        console.log('Answers channel status:', status);
+      channel.subscribe((status) => {
+        console.log('Channel status:', status);
       }),
       setupSubscriptions()
     ]).catch(err => {
@@ -185,8 +195,7 @@ export default function PlayGame() {
 
     return () => {
       mounted = false;
-      supabase.removeChannel(gameChannel);
-      supabase.removeChannel(answersChannel);
+      supabase.removeChannel(channel);
     };
   }, [gameId, playerId]);
 
