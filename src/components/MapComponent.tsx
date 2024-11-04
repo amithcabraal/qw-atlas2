@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import Map, { Marker, MapLayerMouseEvent } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapPin } from 'lucide-react';
@@ -19,13 +19,13 @@ interface MapComponentProps {
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
-export default function MapComponent({ 
+const MapComponent = forwardRef<any, MapComponentProps>(({ 
   onMapClick, 
   markers = [], 
   interactive = true,
   showLabels = false,
   showMarkerLabels = false
-}: MapComponentProps) {
+}, ref) => {
   if (!MAPBOX_TOKEN) {
     console.error('Mapbox token not found');
     return (
@@ -38,6 +38,7 @@ export default function MapComponent({
   return (
     <div className="relative w-full h-full">
       <Map
+        ref={ref}
         mapboxAccessToken={MAPBOX_TOKEN}
         initialViewState={{
           longitude: 0,
@@ -84,7 +85,6 @@ export default function MapComponent({
               </div>
               {marker.label && (
                 <>
-                  {/* Permanent label if showMarkerLabels is true */}
                   {showMarkerLabels && (
                     <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 
                                   whitespace-nowrap bg-black/75 text-white px-2 py-1 
@@ -92,7 +92,6 @@ export default function MapComponent({
                       {marker.label}
                     </div>
                   )}
-                  {/* Tooltip that appears on hover */}
                   <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 
                                 pointer-events-none opacity-0 group-hover:opacity-100 
                                 transition-opacity duration-200 whitespace-nowrap 
@@ -116,4 +115,8 @@ export default function MapComponent({
       )}
     </div>
   );
-}
+});
+
+MapComponent.displayName = 'MapComponent';
+
+export default MapComponent;
