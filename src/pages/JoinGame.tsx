@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { User } from 'lucide-react';
+import { User, History } from 'lucide-react';
+
+interface SavedGame {
+  gameId: string;
+  playerId: string;
+  gameCode: string;
+  timestamp: number;
+}
 
 export default function JoinGame() {
   const { gameCode } = useParams();
@@ -9,6 +16,32 @@ export default function JoinGame() {
   const [initials, setInitials] = useState('');
   const [error, setError] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+  const [savedGame, setSavedGame] = useState<SavedGame | null>(null);
+
+  useEffect(() => {
+    const checkSavedGame = async () => {
+      const saved = localStorage.getItem('lastGame');
+      if (saved) {
+        const game: SavedGame = JSON.parse(saved);
+        if (game.gameCode === gameCode) {
+          // Check if the game is still active
+          const { data, error: gameError } = await supabase
+            .from('games')
+            .select('status')
+            .eq('id', game.gameId)
+            .single();
+
+          if (!gameError && data && data.status !== 'finished') {
+            setSavedGame(game);
+          } else {
+            localStorage.removeItem('lastGame');
+          }
+        }
+      }
+    };
+
+    checkSavedGame();
+  }, [gameCode]);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,12 +84,27 @@ export default function JoinGame() {
         throw playerError;
       }
 
+      // Save game details to local storage
+      const gameDetails: SavedGame = {
+        gameId: game.id,
+        playerId,
+        gameCode: game.code,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('lastGame', JSON.stringify(gameDetails));
+
       navigate(`/play/${game.id}?role=player&playerId=${playerId}`);
     } catch (err) {
       console.error('Error joining game:', err);
       setError('Failed to join game');
     } finally {
       setIsJoining(false);
+    }
+  };
+
+  const handleResume = () => {
+    if (savedGame) {
+      navigate(`/play/${savedGame.gameId}?role=player&playerId=${savedGame.playerId}`);
     }
   };
 
@@ -68,6 +116,20 @@ export default function JoinGame() {
           <h1 className="text-3xl font-bold text-white mt-4">Join Game</h1>
           <p className="text-gray-300 mt-2">Game Code: {gameCode}</p>
         </div>
+
+        {savedGame && (
+          <div className="mb-6">
+            <button
+              onClick={handleResume}
+              className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 
+                       text-white rounded-lg font-medium transition-colors
+                       flex items-center justify-center gap-2"
+            >
+              <History className="w-5 h-5" />
+              Resume Previous Game
+            </button>
+          </div>
+        )}
 
         <form onSubmit={handleJoin} className="space-y-6">
           <div>
