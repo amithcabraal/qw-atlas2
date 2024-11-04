@@ -41,7 +41,6 @@ export default function PlayerView({
 
   useEffect(() => {
     if (hasAnswered && question) {
-      // Center map on correct answer with animation
       mapRef.current?.flyTo({
         center: [question.longitude, question.latitude],
         zoom: 5,
@@ -122,12 +121,12 @@ export default function PlayerView({
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="flex-none p-4">
+    <div className="min-h-screen flex flex-col max-w-3xl mx-auto px-4">
+      <div className="flex-none py-4">
         <QuestionCard question={question} />
       </div>
       
-      <div className="flex-1 relative min-h-[40vh] max-h-[50vh]">
+      <div className="flex-1 relative min-h-[50vh] rounded-xl overflow-hidden shadow-lg">
         <MapComponent
           ref={mapRef}
           onMapClick={hasAnswered ? undefined : handleMapClick}
@@ -141,7 +140,7 @@ export default function PlayerView({
         />
       </div>
 
-      <div className="flex-none p-4 bg-gray-900/50 backdrop-blur-sm">
+      <div className="flex-none py-4">
         {error && (
           <div className="text-center text-red-400 bg-red-900/20 rounded-lg p-4 mb-4">
             {error}
