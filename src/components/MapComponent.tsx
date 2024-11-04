@@ -1,113 +1,69 @@
-import React, { useState } from 'react';
-import { MapLayerMouseEvent } from 'react-map-gl';
-import QuestionCard from './QuestionCard';
-import MapComponent from './MapComponent';
-import { supabase } from '../lib/supabase';
-import { calculateDistance } from '../lib/utils';
+import React from 'react';
+import Map, { Marker, MapLayerMouseEvent } from 'react-map-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { MapPin } from 'lucide-react';
 
-interface Question {
-  id: number;
-  text: string;
-  latitude: number;
-  longitude: number;
-  image?: string;
-  hint?: string;
+interface MapComponentProps {
+  onMapClick?: (e: MapLayerMouseEvent) => void;
+  markers?: Array<{ longitude: number; latitude: number; color?: string }>;
+  interactive?: boolean;
+  showLabels?: boolean;
 }
 
-interface PlayerViewProps {
-  gameId: string;
-  playerId: string;
-  question: Question;
-  hasAnswered: boolean;
-}
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
-export default function PlayerView({
-  gameId,
-  playerId,
-  question,
-  hasAnswered
-}: PlayerViewProps) {
-  const [selectedLocation, setSelectedLocation] = useState<[number, number] | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleMapClick = async (e: MapLayerMouseEvent) => {
-    if (hasAnswered || isSubmitting) return;
-
-    const [longitude, latitude] = e.lngLat.toArray();
-    setSelectedLocation([longitude, latitude]);
-  };
-
-  const handleSubmit = async () => {
-    if (!selectedLocation || hasAnswered || isSubmitting) return;
-
-    try {
-      setIsSubmitting(true);
-      const [longitude, latitude] = selectedLocation;
-
-      const distance = calculateDistance(
-        latitude,
-        longitude,
-        question.latitude,
-        question.longitude
-      );
-
-      // Calculate score based on distance (max 1000 points, minimum 0)
-      const score = Math.max(0, Math.floor(1000 * Math.exp(-distance / 1000)));
-
-      // Submit answer
-      const { error: answerError } = await supabase.from('answers').insert({
-        player_id: playerId,
-        game_id: gameId,
-        question_id: question.id,
-        latitude,
-        longitude,
-        distance,
-        score
-      });
-
-      if (answerError) throw answerError;
-
-      // Update player status
-      const { error: playerError } = await supabase
-        .from('players')
-        .update({ 
-          has_answered: true, 
-          score: score 
-        })
-        .eq('id', playerId);
-
-      if (playerError) throw playerError;
-
-    } catch (err) {
-      console.error('Error submitting answer:', err);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+export default function MapComponent({ 
+  onMapClick, 
+  markers = [], 
+  interactive = true,
+  showLabels = false
+}: MapComponentProps) {
+  if (!MAPBOX_TOKEN) {
+    console.error('Mapbox token not found');
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-800 rounded-xl">
+        <p className="text-red-400">Map configuration error</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto max-w-4xl p-4 space-y-6">
-      <QuestionCard question={question} />
-      <div className="h-[400px] rounded-xl overflow-hidden">
-        <MapComponent
-          onMapClick={hasAnswered ? undefined : handleMapClick}
-          markers={selectedLocation ? [{ longitude: selectedLocation[0], latitude: selectedLocation[1] }] : []}
-          showLabels={false}
-        />
-      </div>
-      {selectedLocation && !hasAnswered && (
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 disabled:bg-green-800
-                   text-white rounded-lg font-medium transition-colors"
-        >
-          {isSubmitting ? 'Submitting...' : 'Submit Answer'}
-        </button>
-      )}
-      {hasAnswered && (
-        <div className="text-center text-white text-lg bg-blue-500/20 rounded-lg p-4">
-          Answer submitted! Waiting for other players...
+    <div className="relative w-full h-full">
+      <Map
+        mapboxAccessToken={MAPBOX_TOKEN}
+        initialViewState={{
+          longitude: 0,
+          latitude: 20,
+          zoom: 1.5
+        }}
+        style={{ width: '100%', height: '100%' }}
+        mapStyle={showLabels ? 
+          "mapbox://styles/mapbox/dark-v11" : 
+          "mapbox://styles/mapbox/satellite-v9"
+        }
+        onClick={onMapClick}
+        interactive={interactive}
+        attributionControl={false}
+        cursor={onMapClick ? 'crosshair' : 'grab'}
+        renderWorldCopies={true}
+        maxBounds={[[-180, -85], [180, 85]]}
+      >
+        {markers.map((marker, index) => (
+          <Marker
+            key={index}
+            longitude={marker.longitude}
+            latitude={marker.latitude}
+            anchor="bottom"
+          >
+            <MapPin 
+              className={`w-6 h-6 ${marker.color || 'text-blue-500'} drop-shadow-lg transition-transform hover:scale-110`}
+            />
+          </Marker>
+        ))}
+      </Map>
+      {onMapClick && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/75 text-white px-4 py-2 rounded-full text-sm">
+          Click anywhere on the map to place your marker
         </div>
       )}
     </div>
