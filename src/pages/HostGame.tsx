@@ -27,6 +27,7 @@ export default function HostGame() {
   const [isLoading, setIsLoading] = useState(true);
   const { shareGame, copied } = useGameSharing();
 
+  // Initial game creation and player fetch
   useEffect(() => {
     const createGame = async () => {
       try {
@@ -51,7 +52,7 @@ export default function HostGame() {
           setGameCode(code);
           setGameId(game.id);
           
-          // Immediately fetch any existing players
+          // Fetch initial players
           const { data: existingPlayers } = await supabase
             .from('players')
             .select('*')
@@ -74,49 +75,36 @@ export default function HostGame() {
     createGame();
   }, []);
 
+  // Real-time subscription setup
   useEffect(() => {
     if (!gameId) return;
 
-    console.log('Setting up subscription for game:', gameId);
-
-    const channel = supabase.channel(`game-${gameId}`, {
-      config: {
-        broadcast: { self: true },
-        presence: { key: 'host' },
-      },
-    });
-
-    const subscription = channel
+    const channel = supabase.channel(`game-${gameId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'players',
-          filter: `game_id=eq.${gameId}`,
+          filter: `game_id=eq.${gameId}`
         },
-        async (payload) => {
-          console.log('Received player update:', payload);
-
-          // Fetch all players again to ensure consistency
+        async () => {
+          // Fetch fresh player list on any change
           const { data: updatedPlayers } = await supabase
             .from('players')
             .select('*')
-            .eq('game_id', gameId);
+            .eq('game_id', gameId)
+            .order('created_at', { ascending: true });
 
           if (updatedPlayers) {
-            console.log('Updated players list:', updatedPlayers);
             setPlayers(updatedPlayers);
           }
         }
       )
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('Cleaning up subscription');
-      subscription.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [gameId]);
 
