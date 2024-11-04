@@ -14,6 +14,22 @@ interface Question {
   hint?: string;
 }
 
+interface Answer {
+  id: string;
+  player_id: string;
+  game_id: string;
+  question_id: number;
+  latitude: number;
+  longitude: number;
+  distance: number;
+  score: number;
+}
+
+interface Player {
+  id: string;
+  initials: string;
+}
+
 interface PlayerViewProps {
   gameId: string;
   playerId: string;
@@ -31,23 +47,87 @@ export default function PlayerView({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasAnswered, setHasAnswered] = useState(initialHasAnswered);
+  const [answers, setAnswers] = useState<Answer[]>([]);
+  const [players, setPlayers] = useState<Record<string, Player>>({});
+  const [isRevealing, setIsRevealing] = useState(false);
   const mapRef = useRef<any>(null);
 
   useEffect(() => {
     setSelectedLocation(null);
     setError(null);
     setHasAnswered(initialHasAnswered);
+    setAnswers([]);
+    setIsRevealing(false);
   }, [question.id, initialHasAnswered]);
 
+  // Subscribe to game status changes
   useEffect(() => {
-    if (hasAnswered && question) {
-      mapRef.current?.flyTo({
-        center: [question.longitude, question.latitude],
-        zoom: 5,
-        duration: 2000
-      });
+    const channel = supabase.channel(`game-${gameId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'games',
+          filter: `id=eq.${gameId}`
+        },
+        async (payload) => {
+          if (payload.new.status === 'revealing') {
+            setIsRevealing(true);
+            await fetchAnswers();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [gameId]);
+
+  const fetchAnswers = async () => {
+    try {
+      // Fetch all answers for the current question
+      const { data: answersData, error: answersError } = await supabase
+        .from('answers')
+        .select('*')
+        .eq('game_id', gameId)
+        .eq('question_id', question.id - 1);
+
+      if (answersError) throw answersError;
+
+      // Fetch all players
+      const { data: playersData, error: playersError } = await supabase
+        .from('players')
+        .select('id, initials')
+        .eq('game_id', gameId);
+
+      if (playersError) throw playersError;
+
+      if (playersData) {
+        const playersMap = playersData.reduce((acc, player) => ({
+          ...acc,
+          [player.id]: player
+        }), {});
+        setPlayers(playersMap);
+      }
+
+      if (answersData) {
+        setAnswers(answersData);
+        
+        // Animate map to show correct location
+        if (mapRef.current) {
+          mapRef.current.flyTo({
+            center: [question.longitude, question.latitude],
+            zoom: 3,
+            duration: 2000
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching answers:', err);
     }
-  }, [hasAnswered, question]);
+  };
 
   const handleMapClick = (e: MapLayerMouseEvent) => {
     if (hasAnswered || isSubmitting) return;
@@ -120,6 +200,28 @@ export default function PlayerView({
     }
   };
 
+  const markers = isRevealing ? [
+    { 
+      latitude: question.latitude, 
+      longitude: question.longitude, 
+      color: 'text-green-500',
+      fill: true,
+      label: 'Correct Location'
+    },
+    ...answers.map(answer => ({
+      latitude: answer.latitude,
+      longitude: answer.longitude,
+      color: answer.player_id === playerId ? 'text-blue-500' : 'text-red-500',
+      fill: true,
+      label: `${players[answer.player_id]?.initials || 'Unknown'} (${answer.score} pts)`
+    }))
+  ] : selectedLocation ? [{ 
+    longitude: selectedLocation[0], 
+    latitude: selectedLocation[1],
+    color: 'text-blue-500',
+    fill: true
+  }] : [];
+
   return (
     <div className="min-h-screen flex flex-col max-w-3xl mx-auto px-4">
       <div className="flex-none py-4">
@@ -130,13 +232,9 @@ export default function PlayerView({
         <MapComponent
           ref={mapRef}
           onMapClick={hasAnswered ? undefined : handleMapClick}
-          markers={selectedLocation ? [{ 
-            longitude: selectedLocation[0], 
-            latitude: selectedLocation[1],
-            color: 'text-blue-500',
-            fill: true
-          }] : []}
-          showLabels={false}
+          markers={markers}
+          showLabels={isRevealing}
+          showMarkerLabels={isRevealing}
         />
       </div>
 
@@ -158,7 +256,7 @@ export default function PlayerView({
           </button>
         )}
         
-        {hasAnswered && (
+        {hasAnswered && !isRevealing && (
           <div className="text-center text-white text-lg bg-blue-500/20 rounded-lg p-4">
             Answer submitted! Waiting for other players...
           </div>
