@@ -8,6 +8,7 @@ export default function JoinGame() {
   const navigate = useNavigate();
   const [initials, setInitials] = useState('');
   const [error, setError] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,13 +19,14 @@ export default function JoinGame() {
     }
 
     try {
-      const { data: game } = await supabase
+      setIsJoining(true);
+      const { data: game, error: gameError } = await supabase
         .from('games')
         .select()
         .eq('code', gameCode)
         .single();
 
-      if (!game) {
+      if (gameError || !game) {
         setError('Game not found');
         return;
       }
@@ -35,27 +37,26 @@ export default function JoinGame() {
       }
 
       const playerId = crypto.randomUUID();
-      const player = {
-        id: playerId,
-        initials: initials.toUpperCase(),
-        gameId: game.id,
-        score: 0,
-        hasAnswered: false
-      };
-
-      await supabase.from('players').insert(player);
-      
-      await supabase
-        .channel(`game:${game.id}`)
-        .send({
-          type: 'broadcast',
-          event: 'player_joined',
-          payload: { player }
+      const { error: playerError } = await supabase
+        .from('players')
+        .insert({
+          id: playerId,
+          initials: initials.toUpperCase(),
+          game_id: game.id,
+          score: 0,
+          has_answered: false
         });
 
+      if (playerError) {
+        throw playerError;
+      }
+
       navigate(`/play/${game.id}?role=player&playerId=${playerId}`);
-    } catch (error) {
+    } catch (err) {
+      console.error('Error joining game:', err);
       setError('Failed to join game');
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -83,16 +84,18 @@ export default function JoinGame() {
                        rounded-md text-white placeholder-gray-400 focus:outline-none 
                        focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="ABC"
+              disabled={isJoining}
             />
             {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
           </div>
 
           <button
             type="submit"
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white 
-                     rounded-lg font-medium transition-colors"
+            disabled={isJoining}
+            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 
+                     text-white rounded-lg font-medium transition-colors"
           >
-            Join Game
+            {isJoining ? 'Joining...' : 'Join Game'}
           </button>
         </form>
       </div>
