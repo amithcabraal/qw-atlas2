@@ -47,15 +47,18 @@ export default function PlayGame() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchGameData = async () => {
-      if (!gameId) {
-        setError('No game ID provided');
-        setLoading(false);
-        return;
-      }
+    if (!gameId) {
+      setError('No game ID provided');
+      setLoading(false);
+      return;
+    }
 
+    let mounted = true;
+    let gameChannel: any = null;
+
+    const setupSubscriptions = async () => {
       try {
-        // Fetch game data
+        // Fetch initial game data
         const { data: gameData, error: gameError } = await supabase
           .from('games')
           .select('*')
@@ -64,26 +67,29 @@ export default function PlayGame() {
 
         if (gameError) throw gameError;
         if (!gameData) throw new Error('Game not found');
+        
+        if (mounted) {
+          setGame(gameData);
+        }
 
-        setGame(gameData);
-
-        // Fetch players
+        // Fetch initial players
         const { data: playersData, error: playersError } = await supabase
           .from('players')
           .select('*')
           .eq('game_id', gameId);
 
         if (playersError) throw playersError;
-        setPlayers(playersData || []);
-
-        // Set current player if in player mode
-        if (playerId && playersData) {
-          const player = playersData.find(p => p.id === playerId);
-          setCurrentPlayer(player || null);
+        
+        if (mounted) {
+          setPlayers(playersData || []);
+          if (playerId && playersData) {
+            const player = playersData.find(p => p.id === playerId);
+            setCurrentPlayer(player || null);
+          }
         }
 
-        // Subscribe to real-time updates
-        const gameChannel = supabase.channel(`game-${gameId}`)
+        // Set up real-time subscriptions
+        gameChannel = supabase.channel(`game:${gameId}`)
           .on(
             'postgres_changes',
             {
@@ -94,7 +100,9 @@ export default function PlayGame() {
             },
             (payload) => {
               console.log('Game update:', payload);
-              setGame(payload.new as Game);
+              if (mounted) {
+                setGame(payload.new as Game);
+              }
             }
           )
           .on(
@@ -107,12 +115,17 @@ export default function PlayGame() {
             },
             (payload) => {
               console.log('Players update:', payload);
+              if (!mounted) return;
+
               if (payload.eventType === 'INSERT') {
                 setPlayers(current => [...current, payload.new as Player]);
               } else if (payload.eventType === 'UPDATE') {
                 setPlayers(current =>
                   current.map(p => p.id === payload.new.id ? payload.new as Player : p)
                 );
+                if (playerId && payload.new.id === playerId) {
+                  setCurrentPlayer(payload.new as Player);
+                }
               }
             }
           )
@@ -126,26 +139,85 @@ export default function PlayGame() {
             },
             (payload) => {
               console.log('Answers update:', payload);
+              if (!mounted) return;
+              
               if (payload.eventType === 'INSERT') {
                 setAnswers(current => [...current, payload.new as Answer]);
               }
             }
           );
 
-        gameChannel.subscribe((status) => {
-          console.log('Game channel status:', status);
-        });
+        await gameChannel.subscribe();
+        console.log('All subscriptions established');
 
       } catch (err) {
-        console.error('Error fetching game data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load game');
+        console.error('Error in setup:', err);
+        if (mounted) {
+          setError(err instanceof Error ? err.message : 'Failed to load game');
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchGameData();
+    setupSubscriptions();
+
+    return () => {
+      mounted = false;
+      if (gameChannel) {
+        console.log('Cleaning up subscriptions');
+        supabase.removeChannel(gameChannel);
+      }
+    };
   }, [gameId, playerId]);
+
+  const handleNextQuestion = async () => {
+    if (!game || !gameId) return;
+
+    const nextQuestion = game.current_question + 1;
+    if (nextQuestion >= questions.length) {
+      await supabase
+        .from('games')
+        .update({ status: 'finished' })
+        .eq('id', gameId);
+    } else {
+      await supabase
+        .from('games')
+        .update({
+          current_question: nextQuestion,
+          status: 'playing'
+        })
+        .eq('id', gameId);
+
+      await supabase
+        .from('players')
+        .update({ has_answered: false })
+        .eq('game_id', gameId);
+
+      setAnswers([]);
+    }
+  };
+
+  const handleRevealAnswers = async () => {
+    if (!gameId || !game) return;
+
+    await supabase
+      .from('games')
+      .update({ status: 'revealing' })
+      .eq('id', gameId);
+
+    const { data: answersData } = await supabase
+      .from('answers')
+      .select('*')
+      .eq('game_id', gameId)
+      .eq('question_id', questions[game.current_question].id);
+
+    if (answersData) {
+      setAnswers(answersData);
+    }
+  };
 
   if (loading) {
     return (
@@ -186,46 +258,8 @@ export default function PlayGame() {
         currentQuestion={game.current_question}
         players={players}
         answers={answers}
-        onNextQuestion={async () => {
-          const nextQuestion = game.current_question + 1;
-          if (nextQuestion >= questions.length) {
-            await supabase
-              .from('games')
-              .update({ status: 'finished' })
-              .eq('id', gameId);
-          } else {
-            await supabase
-              .from('games')
-              .update({
-                current_question: nextQuestion,
-                status: 'playing'
-              })
-              .eq('id', gameId);
-
-            await supabase
-              .from('players')
-              .update({ has_answered: false })
-              .eq('game_id', gameId);
-
-            setAnswers([]);
-          }
-        }}
-        onRevealAnswers={async () => {
-          await supabase
-            .from('games')
-            .update({ status: 'revealing' })
-            .eq('id', gameId);
-
-          const { data: answersData } = await supabase
-            .from('answers')
-            .select('*')
-            .eq('game_id', gameId)
-            .eq('question_id', questions[game.current_question].id);
-
-          if (answersData) {
-            setAnswers(answersData);
-          }
-        }}
+        onNextQuestion={handleNextQuestion}
+        onRevealAnswers={handleRevealAnswers}
       />
     );
   }
