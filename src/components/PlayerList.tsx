@@ -5,7 +5,7 @@ interface Player {
   id: string;
   initials: string;
   score: number;
-  hasAnswered: boolean;
+  has_answered: boolean;
   game_id: string;
 }
 
@@ -34,7 +34,7 @@ export default function PlayerList({ players, showAnswered = false }: PlayerList
             {showAnswered && (
               <CheckCircle2 
                 className={`w-5 h-5 ${
-                  player.hasAnswered ? 'text-green-400' : 'text-gray-400'
+                  player.has_answered ? 'text-green-400' : 'text-gray-400'
                 }`} 
               />
             )}
