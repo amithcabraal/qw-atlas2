@@ -126,7 +126,7 @@ export default function PlayerView({
         <QuestionCard question={question} />
       </div>
       
-      <div className="flex-1 relative min-h-[50vh] rounded-xl overflow-hidden shadow-lg">
+      <div className="h-[calc(100vh-24rem)] min-h-[300px] rounded-xl overflow-hidden shadow-lg">
         <MapComponent
           ref={mapRef}
           onMapClick={hasAnswered ? undefined : handleMapClick}
@@ -140,7 +140,7 @@ export default function PlayerView({
         />
       </div>
 
-      <div className="flex-none py-4">
+      <div className="flex-none py-4 mt-auto">
         {error && (
           <div className="text-center text-red-400 bg-red-900/20 rounded-lg p-4 mb-4">
             {error}
