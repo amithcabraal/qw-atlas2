@@ -46,6 +46,30 @@ export default function HostView({
   const question = questions[currentQuestion];
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
 
+  useEffect(() => {
+    // Subscribe to answers updates
+    const answersChannel = supabase.channel(`answers-${gameId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'answers',
+          filter: `game_id=eq.${gameId}`
+        },
+        (payload) => {
+          console.log('Answer update received:', payload);
+        }
+      )
+      .subscribe((status) => {
+        console.log('Answers subscription status:', status);
+      });
+
+    return () => {
+      supabase.removeChannel(answersChannel);
+    };
+  }, [gameId]);
+
   const markers = showingAnswers
     ? [
         { 
