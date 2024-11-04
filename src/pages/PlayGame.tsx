@@ -1,14 +1,41 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { questions } from '../data/questions';
-import { Player, Game, Answer } from '../types';
 import HostView from '../components/HostView';
 import PlayerView from '../components/PlayerView';
+
+interface Player {
+  id: string;
+  initials: string;
+  game_id: string;
+  score: number;
+  has_answered: boolean;
+}
+
+interface Game {
+  id: string;
+  code: string;
+  status: 'waiting' | 'playing' | 'revealing' | 'finished';
+  current_question: number;
+  host_id: string;
+}
+
+interface Answer {
+  id: string;
+  player_id: string;
+  game_id: string;
+  question_id: number;
+  latitude: number;
+  longitude: number;
+  distance: number;
+  score: number;
+}
 
 export default function PlayGame() {
   const { gameId } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const role = searchParams.get('role');
   const playerId = searchParams.get('playerId');
 
@@ -16,137 +43,189 @@ export default function PlayGame() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchGameData = async () => {
-      if (!gameId) return;
+      if (!gameId) {
+        setError('No game ID provided');
+        setLoading(false);
+        return;
+      }
 
-      const { data: gameData } = await supabase
-        .from('games')
-        .select()
-        .eq('id', gameId)
-        .single();
+      try {
+        // Fetch game data
+        const { data: gameData, error: gameError } = await supabase
+          .from('games')
+          .select('*')
+          .eq('id', gameId)
+          .single();
 
-      if (gameData) {
+        if (gameError) throw gameError;
+        if (!gameData) throw new Error('Game not found');
+
         setGame(gameData);
-      }
 
-      const { data: playersData } = await supabase
-        .from('players')
-        .select()
-        .eq('gameId', gameId);
+        // Fetch players
+        const { data: playersData, error: playersError } = await supabase
+          .from('players')
+          .select('*')
+          .eq('game_id', gameId);
 
-      if (playersData) {
-        setPlayers(playersData);
-      }
+        if (playersError) throw playersError;
+        setPlayers(playersData || []);
 
-      if (playerId) {
-        const player = playersData?.find(p => p.id === playerId) || null;
-        setCurrentPlayer(player);
+        // Set current player if in player mode
+        if (playerId && playersData) {
+          const player = playersData.find(p => p.id === playerId);
+          setCurrentPlayer(player || null);
+        }
+
+        // Subscribe to real-time updates
+        const gameChannel = supabase.channel(`game-${gameId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'games',
+              filter: `id=eq.${gameId}`
+            },
+            (payload) => {
+              console.log('Game update:', payload);
+              setGame(payload.new as Game);
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'players',
+              filter: `game_id=eq.${gameId}`
+            },
+            (payload) => {
+              console.log('Players update:', payload);
+              if (payload.eventType === 'INSERT') {
+                setPlayers(current => [...current, payload.new as Player]);
+              } else if (payload.eventType === 'UPDATE') {
+                setPlayers(current =>
+                  current.map(p => p.id === payload.new.id ? payload.new as Player : p)
+                );
+              }
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'answers',
+              filter: `game_id=eq.${gameId}`
+            },
+            (payload) => {
+              console.log('Answers update:', payload);
+              if (payload.eventType === 'INSERT') {
+                setAnswers(current => [...current, payload.new as Answer]);
+              }
+            }
+          );
+
+        gameChannel.subscribe((status) => {
+          console.log('Game channel status:', status);
+        });
+
+      } catch (err) {
+        console.error('Error fetching game data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load game');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchGameData();
-
-    // Set up real-time subscriptions
-    const gameSubscription = supabase
-      .channel(`game:${gameId}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'games',
-        filter: `id=eq.${gameId}`
-      }, (payload) => {
-        setGame(payload.new as Game);
-      })
-      .subscribe();
-
-    const playerSubscription = supabase
-      .channel(`players:${gameId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'players',
-        filter: `gameId=eq.${gameId}`
-      }, (payload) => {
-        setPlayers(current => {
-          const updated = [...current];
-          const index = updated.findIndex(p => p.id === payload.new.id);
-          if (index >= 0) {
-            updated[index] = payload.new;
-          } else {
-            updated.push(payload.new);
-          }
-          return updated;
-        });
-      })
-      .subscribe();
-
-    return () => {
-      gameSubscription.unsubscribe();
-      playerSubscription.unsubscribe();
-    };
   }, [gameId, playerId]);
 
-  const handleNextQuestion = async () => {
-    if (!game) return;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-white text-xl">Loading game...</div>
+      </div>
+    );
+  }
 
-    const nextQuestion = game.currentQuestion + 1;
-    if (nextQuestion >= questions.length) {
-      await supabase
-        .from('games')
-        .update({ status: 'finished' })
-        .eq('id', gameId);
-    } else {
-      await supabase
-        .from('games')
-        .update({
-          currentQuestion: nextQuestion,
-          status: 'playing'
-        })
-        .eq('id', gameId);
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-red-400 text-xl">{error}</div>
+      </div>
+    );
+  }
 
-      await supabase
-        .from('players')
-        .update({ hasAnswered: false })
-        .eq('gameId', gameId);
+  if (!game) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-red-400 text-xl">Game not found</div>
+      </div>
+    );
+  }
 
-      setAnswers([]);
-    }
-  };
-
-  const handleRevealAnswers = async () => {
-    if (!gameId) return;
-
-    await supabase
-      .from('games')
-      .update({ status: 'revealing' })
-      .eq('id', gameId);
-
-    const { data: answersData } = await supabase
-      .from('answers')
-      .select()
-      .eq('gameId', gameId)
-      .eq('questionId', questions[game?.currentQuestion || 0].id);
-
-    if (answersData) {
-      setAnswers(answersData);
-    }
-  };
-
-  if (!game || !questions[game.currentQuestion]) {
-    return <div>Loading...</div>;
+  if (!questions[game.current_question]) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-white text-xl">Game finished!</div>
+      </div>
+    );
   }
 
   if (role === 'host') {
     return (
       <HostView
         gameId={gameId!}
-        currentQuestion={game.currentQuestion}
+        currentQuestion={game.current_question}
         players={players}
         answers={answers}
-        onNextQuestion={handleNextQuestion}
-        onRevealAnswers={handleRevealAnswers}
+        onNextQuestion={async () => {
+          const nextQuestion = game.current_question + 1;
+          if (nextQuestion >= questions.length) {
+            await supabase
+              .from('games')
+              .update({ status: 'finished' })
+              .eq('id', gameId);
+          } else {
+            await supabase
+              .from('games')
+              .update({
+                current_question: nextQuestion,
+                status: 'playing'
+              })
+              .eq('id', gameId);
+
+            await supabase
+              .from('players')
+              .update({ has_answered: false })
+              .eq('game_id', gameId);
+
+            setAnswers([]);
+          }
+        }}
+        onRevealAnswers={async () => {
+          await supabase
+            .from('games')
+            .update({ status: 'revealing' })
+            .eq('id', gameId);
+
+          const { data: answersData } = await supabase
+            .from('answers')
+            .select('*')
+            .eq('game_id', gameId)
+            .eq('question_id', questions[game.current_question].id);
+
+          if (answersData) {
+            setAnswers(answersData);
+          }
+        }}
       />
     );
   }
@@ -156,11 +235,15 @@ export default function PlayGame() {
       <PlayerView
         gameId={gameId!}
         playerId={currentPlayer.id}
-        question={questions[game.currentQuestion]}
-        hasAnswered={currentPlayer.hasAnswered}
+        question={questions[game.current_question]}
+        hasAnswered={currentPlayer.has_answered}
       />
     );
   }
 
-  return <div>Invalid game state</div>;
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-red-400 text-xl">Invalid game state</div>
+    </div>
+  );
 }
