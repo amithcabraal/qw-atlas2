@@ -88,7 +88,13 @@ export default function PlayGame() {
               filter: `id=eq.${gameId}`
             },
             (payload) => {
-              setGame(payload.new as Game);
+              const updatedGame = payload.new as Game;
+              setGame(updatedGame);
+              
+              // If the game status changes to 'playing', update player's has_answered status
+              if (updatedGame.status === 'playing' && currentPlayer) {
+                setCurrentPlayer(prev => prev ? { ...prev, has_answered: false } : null);
+              }
             }
           )
           .on(
@@ -130,6 +136,9 @@ export default function PlayGame() {
           );
 
         gameChannel.subscribe();
+        return () => {
+          supabase.removeChannel(gameChannel);
+        };
       } catch (err) {
         console.error('Error fetching game data:', err);
         setError('Failed to load game data');
