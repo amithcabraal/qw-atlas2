@@ -47,8 +47,19 @@ export default function HostView({
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
 
   useEffect(() => {
-    // Subscribe to answers updates
-    const answersChannel = supabase.channel(`answers-${gameId}`)
+    const channel = supabase.channel(`game-updates-${gameId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'players',
+          filter: `game_id=eq.${gameId}`
+        },
+        (payload) => {
+          console.log('Player update received:', payload);
+        }
+      )
       .on(
         'postgres_changes',
         {
@@ -60,13 +71,14 @@ export default function HostView({
         (payload) => {
           console.log('Answer update received:', payload);
         }
-      )
-      .subscribe((status) => {
-        console.log('Answers subscription status:', status);
-      });
+      );
+
+    channel.subscribe((status) => {
+      console.log('Host view subscription status:', status);
+    });
 
     return () => {
-      supabase.removeChannel(answersChannel);
+      supabase.removeChannel(channel);
     };
   }, [gameId]);
 
