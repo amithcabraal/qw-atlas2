@@ -64,32 +64,39 @@ export default function PlayerView({
       // Calculate score based on distance (max 1000 points, minimum 0)
       const score = Math.max(0, Math.floor(1000 * Math.exp(-distance / 1000)));
 
-      // Submit answer
-      const { error: answerError } = await supabase.from('answers').insert({
-        player_id: playerId,
-        game_id: gameId,
-        question_id: question.id,
-        latitude,
-        longitude,
-        distance,
-        score
-      });
-
-      if (answerError) throw answerError;
-
-      // Update player status
+      // First update player status
       const { error: playerError } = await supabase
         .from('players')
         .update({ 
-          has_answered: true, 
+          has_answered: true,
           score: score 
         })
         .eq('id', playerId);
 
       if (playerError) throw playerError;
 
+      // Then submit answer
+      const { error: answerError } = await supabase
+        .from('answers')
+        .insert({
+          player_id: playerId,
+          game_id: gameId,
+          question_id: question.id,
+          latitude,
+          longitude,
+          distance,
+          score
+        });
+
+      if (answerError) throw answerError;
+
     } catch (err) {
       console.error('Error submitting answer:', err);
+      // Revert player status if answer submission fails
+      await supabase
+        .from('players')
+        .update({ has_answered: false })
+        .eq('id', playerId);
     } finally {
       setIsSubmitting(false);
     }
