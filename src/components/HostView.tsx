@@ -57,6 +57,7 @@ export default function HostView({
   const [isRevealing, setIsRevealing] = useState(false);
   const [playersWithScores, setPlayersWithScores] = useState<Player[]>(players);
   const [error, setError] = useState<string | null>(null);
+  const mapRef = useRef<any>(null);
   
   const question = questions[currentQuestion];
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
@@ -67,7 +68,6 @@ export default function HostView({
     setDisplayedAnswers([]);
     setIsRevealing(false);
     setError(null);
-    // Store current scores as lastScore when moving to next question
     setPlayersWithScores(players.map(player => ({
       ...player,
       lastScore: player.score
@@ -76,45 +76,54 @@ export default function HostView({
 
   useEffect(() => {
     if (showingAnswers) {
-      const relevantAnswers = propAnswers.filter(a => a.question_id === currentQuestion);
-      setDisplayedAnswers(relevantAnswers);
+      revealAnswersSequentially();
     }
-  }, [propAnswers, showingAnswers, currentQuestion]);
+  }, [showingAnswers]);
 
-  // Auto-reveal answers when all players have submitted
-  useEffect(() => {
-    if (allPlayersAnswered && !showingAnswers && !isRevealing) {
-      handleReveal();
+  const revealAnswersSequentially = async () => {
+    if (!mapRef.current) return;
+
+    // First, fly to the correct location
+    mapRef.current.flyTo({
+      center: [question.longitude, question.latitude],
+      zoom: 5,
+      duration: 2000
+    });
+
+    // Wait for the fly animation
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const relevantAnswers = propAnswers
+      .filter(a => a.question_id === currentQuestion)
+      .sort((a, b) => b.distance - a.distance); // Sort by distance, furthest first
+
+    // Reveal answers one by one
+    for (let i = 0; i < relevantAnswers.length; i++) {
+      const isTopFive = i >= relevantAnswers.length - 5;
+      const delay = isTopFive ? 1000 : 500; // Longer delay for top 5
+
+      // If it's a top 5 answer, adjust the map view
+      if (isTopFive) {
+        const answer = relevantAnswers[i];
+        mapRef.current.flyTo({
+          center: [answer.longitude, answer.latitude],
+          zoom: 4,
+          duration: 1000
+        });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      setDisplayedAnswers(prev => [...prev, relevantAnswers[i]]);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-  }, [allPlayersAnswered]);
 
-  // Update players with score changes
-  useEffect(() => {
-    setPlayersWithScores(players.map(player => ({
-      ...player,
-      lastScore: playersWithScores.find(p => p.id === player.id)?.lastScore
-    })));
-  }, [players]);
-
-  const markers = showingAnswers ? [
-    { 
-      latitude: question.latitude, 
-      longitude: question.longitude, 
-      color: 'text-green-500',
-      fill: true,
-      label: 'Correct Location'
-    },
-    ...displayedAnswers.map(answer => {
-      const player = players.find(p => p.id === answer.player_id);
-      return {
-        latitude: answer.latitude,
-        longitude: answer.longitude,
-        color: 'text-red-500',
-        fill: true,
-        label: `${player?.initials || 'Unknown'} (${answer.score} pts)`
-      };
-    })
-  ] : [];
+    // Finally, show the full view
+    mapRef.current.flyTo({
+      center: [question.longitude, question.latitude],
+      zoom: 3,
+      duration: 1500
+    });
+  };
 
   const handleReveal = async () => {
     if (isRevealing || !allPlayersAnswered) return;
@@ -142,13 +151,25 @@ export default function HostView({
     }
   };
 
-  if (!question) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-white text-xl">Loading question...</div>
-      </div>
-    );
-  }
+  const markers = showingAnswers ? [
+    { 
+      latitude: question.latitude, 
+      longitude: question.longitude, 
+      color: 'text-green-500',
+      fill: true,
+      label: 'Correct Location'
+    },
+    ...displayedAnswers.map(answer => {
+      const player = players.find(p => p.id === answer.player_id);
+      return {
+        latitude: answer.latitude,
+        longitude: answer.longitude,
+        color: 'text-red-500',
+        fill: true,
+        label: `${player?.initials || 'Unknown'} (${answer.score} pts)`
+      };
+    })
+  ] : [];
 
   return (
     <div className="container mx-auto max-w-4xl p-4 space-y-6">
@@ -161,11 +182,23 @@ export default function HostView({
         <div>
           <QuestionCard question={question} showHint={true} />
           <div className="mt-4 space-y-4">
+            {allPlayersAnswered && !showingAnswers && (
+              <button
+                onClick={handleReveal}
+                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 
+                         text-white rounded-lg font-medium transition-colors 
+                         flex items-center justify-center gap-2"
+              >
+                <Eye className="w-5 h-5" />
+                Reveal Answers
+              </button>
+            )}
             {showingAnswers && (
               <button
                 onClick={handleNext}
                 className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 
-                         text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                         text-white rounded-lg font-medium transition-colors 
+                         flex items-center justify-center gap-2"
               >
                 {isLastQuestion ? (
                   <>
@@ -195,6 +228,7 @@ export default function HostView({
       </div>
       <div className="h-[400px] rounded-xl overflow-hidden">
         <MapComponent 
+          ref={mapRef}
           markers={markers}
           interactive={true}
           showLabels={showingAnswers}
