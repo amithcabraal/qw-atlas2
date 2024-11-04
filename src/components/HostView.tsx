@@ -50,6 +50,7 @@ export default function HostView({
 
   // Reset state when question changes
   useEffect(() => {
+    console.log('Question changed, resetting state');
     setShowingAnswers(false);
     setDisplayedAnswers([]);
     setIsRevealing(false);
@@ -59,7 +60,7 @@ export default function HostView({
   useEffect(() => {
     if (showingAnswers) {
       const relevantAnswers = propAnswers.filter(a => a.question_id === question.id);
-      console.log('Updating displayed answers:', relevantAnswers);
+      console.log('Setting displayed answers:', relevantAnswers);
       setDisplayedAnswers(relevantAnswers);
     }
   }, [propAnswers, question.id, showingAnswers]);
@@ -90,11 +91,9 @@ export default function HostView({
 
     try {
       setIsRevealing(true);
-      
-      // Set local state
       setShowingAnswers(true);
       
-      // Notify parent
+      // Notify parent to update game status
       onRevealAnswers();
 
       // Fetch answers directly
@@ -112,15 +111,12 @@ export default function HostView({
       }
     } catch (err) {
       console.error('Error revealing answers:', err);
-      setShowingAnswers(false);
-      setDisplayedAnswers([]);
     } finally {
       setIsRevealing(false);
     }
   };
 
   const handleNext = () => {
-    if (!showingAnswers) return;
     onNextQuestion();
   };
 
