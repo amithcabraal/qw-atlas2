@@ -43,24 +43,24 @@ export default function HostView({
   onRevealAnswers
 }: HostViewProps) {
   const [showingAnswers, setShowingAnswers] = useState(false);
-  const [currentAnswers, setCurrentAnswers] = useState<Answer[]>([]);
+  const [displayedAnswers, setDisplayedAnswers] = useState<Answer[]>([]);
   const question = questions[currentQuestion];
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
 
-  // Update current answers when answers prop changes and we're showing answers
+  // Reset state when question changes
+  useEffect(() => {
+    setShowingAnswers(false);
+    setDisplayedAnswers([]);
+  }, [currentQuestion]);
+
+  // Update displayed answers when prop answers change and we're showing answers
   useEffect(() => {
     if (showingAnswers) {
       const relevantAnswers = propAnswers.filter(a => a.question_id === question.id);
-      console.log('Setting current answers:', relevantAnswers);
-      setCurrentAnswers(relevantAnswers);
+      console.log('Updating displayed answers:', relevantAnswers);
+      setDisplayedAnswers(relevantAnswers);
     }
   }, [propAnswers, question.id, showingAnswers]);
-
-  // Clear answers when question changes
-  useEffect(() => {
-    setShowingAnswers(false);
-    setCurrentAnswers([]);
-  }, [currentQuestion]);
 
   // Prepare markers for the map
   const markers = showingAnswers ? [
@@ -71,7 +71,7 @@ export default function HostView({
       fill: true,
       label: 'Correct Location'
     },
-    ...currentAnswers.map(answer => {
+    ...displayedAnswers.map(answer => {
       const player = players.find(p => p.id === answer.player_id);
       return {
         latitude: answer.latitude,
@@ -83,15 +83,17 @@ export default function HostView({
     })
   ] : [];
 
-  const handleNext = () => {
-    onNextQuestion();
-  };
-
   const handleReveal = async () => {
+    if (!allPlayersAnswered || showingAnswers) return;
+
     try {
+      // Set local state first
       setShowingAnswers(true);
+      
+      // Notify parent
       onRevealAnswers();
 
+      // Fetch answers directly
       const { data: answersData, error: answersError } = await supabase
         .from('answers')
         .select('*')
@@ -102,12 +104,18 @@ export default function HostView({
 
       if (answersData) {
         console.log('Fetched answers on reveal:', answersData);
-        setCurrentAnswers(answersData);
+        setDisplayedAnswers(answersData);
       }
     } catch (err) {
       console.error('Error revealing answers:', err);
       setShowingAnswers(false);
+      setDisplayedAnswers([]);
     }
+  };
+
+  const handleNext = () => {
+    if (!showingAnswers) return;
+    onNextQuestion();
   };
 
   return (
