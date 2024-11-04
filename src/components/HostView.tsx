@@ -53,14 +53,12 @@ export default function HostView({
     setLocalPlayers(players);
   }, [players]);
 
-  // Update current answers when answers prop changes or showing state changes
+  // Update current answers when answers prop changes
   useEffect(() => {
-    if (showingAnswers) {
-      const filteredAnswers = answers.filter(a => a.question_id === question.id);
-      console.log('Filtered answers for question', question.id, ':', filteredAnswers);
-      setCurrentAnswers(filteredAnswers);
-    }
-  }, [answers, question.id, showingAnswers]);
+    const filteredAnswers = answers.filter(a => a.question_id === question.id);
+    console.log('Filtered answers for question', question.id, ':', filteredAnswers);
+    setCurrentAnswers(filteredAnswers);
+  }, [answers, question.id]);
 
   // Set up real-time subscriptions
   useEffect(() => {
@@ -94,11 +92,11 @@ export default function HostView({
           event: '*',
           schema: 'public',
           table: 'answers',
-          filter: `game_id=eq.${gameId}`
+          filter: `game_id=eq.${gameId} AND question_id=eq.${question.id}`
         },
         (payload) => {
           console.log('Answer update received:', payload);
-          if (payload.eventType === 'INSERT' && payload.new.question_id === question.id && showingAnswers) {
+          if (payload.eventType === 'INSERT') {
             setCurrentAnswers(current => [...current, payload.new as Answer]);
           }
         }
@@ -112,10 +110,10 @@ export default function HostView({
       console.log('Cleaning up host view subscriptions');
       supabase.removeChannel(channel);
     };
-  }, [gameId, question.id, showingAnswers]);
+  }, [gameId, question.id]);
 
   // Prepare markers for the map
-  const markers = showingAnswers
+  const markers = showingAnswers || currentAnswers.length > 0
     ? [
         { 
           latitude: question.latitude, 
@@ -124,13 +122,16 @@ export default function HostView({
           fill: true,
           label: 'Correct Location'
         },
-        ...currentAnswers.map(answer => ({
-          latitude: answer.latitude,
-          longitude: answer.longitude,
-          color: 'text-red-500',
-          fill: true,
-          label: `${localPlayers.find(p => p.id === answer.player_id)?.initials || 'Unknown'}`
-        }))
+        ...currentAnswers.map(answer => {
+          const player = localPlayers.find(p => p.id === answer.player_id);
+          return {
+            latitude: answer.latitude,
+            longitude: answer.longitude,
+            color: 'text-red-500',
+            fill: true,
+            label: player?.initials || 'Unknown'
+          };
+        })
       ]
     : [];
 
