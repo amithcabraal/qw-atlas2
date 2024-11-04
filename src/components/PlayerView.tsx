@@ -67,21 +67,6 @@ export default function PlayerView({
 
       const score = Math.max(0, Math.floor(1000 * Math.exp(-distance / 1000)));
 
-      // First submit answer
-      const { error: answerError } = await supabase
-        .from('answers')
-        .insert({
-          player_id: playerId,
-          game_id: gameId,
-          question_id: question.id,
-          latitude,
-          longitude,
-          distance,
-          score
-        });
-
-      if (answerError) throw answerError;
-
       // First get current player score
       const { data: playerData, error: fetchError } = await supabase
         .from('players')
@@ -91,7 +76,22 @@ export default function PlayerView({
 
       if (fetchError) throw fetchError;
 
-      // Then update player status and add new score
+      // Submit answer with the actual question ID from the question object
+      const { error: answerError } = await supabase
+        .from('answers')
+        .insert({
+          player_id: playerId,
+          game_id: gameId,
+          question_id: question.id - 1, // Adjust for 0-based index in current_question
+          latitude,
+          longitude,
+          distance,
+          score
+        });
+
+      if (answerError) throw answerError;
+
+      // Update player status and add new score
       const { error: playerError } = await supabase
         .from('players')
         .update({ 
@@ -101,8 +101,9 @@ export default function PlayerView({
         .eq('id', playerId);
 
       if (playerError) throw playerError;
-
+      
       setHasAnswered(true);
+
     } catch (err) {
       console.error('Error submitting answer:', err);
       setError('Failed to submit answer. Please try again.');
