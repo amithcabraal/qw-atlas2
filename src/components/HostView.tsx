@@ -71,10 +71,14 @@ export default function HostView({
     
     if (showingAnswers) {
       // Only show answers for the current question
+      console.log("About to filter propanswers based on a.question === ", currentQuestion);
+      
       const relevantAnswers = propAnswers.filter(a => a.question_id === currentQuestion);
       console.log('Setting displayed answers:', relevantAnswers);
       setDisplayedAnswers(relevantAnswers);
     } else {
+      console/log("showingAnswers is false, so setting displayed answers to []@);
+                  
       setDisplayedAnswers([]);
     }
   }, [propAnswers, showingAnswers, currentQuestion]);
@@ -110,6 +114,8 @@ export default function HostView({
       onRevealAnswers();
 
       // Fetch answers for current question
+      console.log ("Fetching answers for current question", currentQuestion);
+      
       const { data: answersData, error: answersError } = await supabase
         .from('answers')
         .select('*')
@@ -118,7 +124,8 @@ export default function HostView({
 
       if (answersError) throw answersError;
 
-      console.log('Fetched answers on reveal:', answersData);
+      
+      console.log('Fetched answers on reveal (question: ', currentQuestion, ') :', answersData);
       
       // Update local state
       setShowingAnswers(true);
