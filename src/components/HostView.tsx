@@ -56,14 +56,21 @@ export default function HostView({
     setIsRevealing(false);
   }, [currentQuestion]);
 
-  // Update displayed answers when answers prop changes
+  // Update displayed answers when answers prop changes or showing state changes
   useEffect(() => {
+    console.log('Answers or showing state changed:', { 
+      showingAnswers, 
+      answersCount: propAnswers.length,
+      currentQuestion 
+    });
+    
     if (showingAnswers) {
-      const relevantAnswers = propAnswers.filter(a => a.question_id === question.id);
-      console.log('Updating displayed answers:', relevantAnswers);
+      // Filter answers for current question number
+      const relevantAnswers = propAnswers.filter(a => a.question_id === currentQuestion);
+      console.log('Setting displayed answers:', relevantAnswers);
       setDisplayedAnswers(relevantAnswers);
     }
-  }, [propAnswers, question.id, showingAnswers]);
+  }, [propAnswers, currentQuestion, showingAnswers]);
 
   // Prepare markers for the map
   const markers = showingAnswers ? [
@@ -101,7 +108,7 @@ export default function HostView({
         .from('answers')
         .select('*')
         .eq('game_id', gameId)
-        .eq('question_id', question.id);
+        .eq('question_id', currentQuestion);
 
       if (answersError) throw answersError;
 
