@@ -55,16 +55,29 @@ export default function PlayerView({
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [players, setPlayers] = useState<Record<string, Player>>({});
   const [isRevealing, setIsRevealing] = useState(false);
+  const [currentQuestionId, setCurrentQuestionId] = useState(question.id);
   const mapRef = useRef<any>(null);
 
-  // Reset state for new question
+  // Handle question changes
   useEffect(() => {
-    setSelectedLocation(null);
-    setError(null);
-    setHasAnswered(initialHasAnswered);
-    setAnswers([]);
-    setIsRevealing(false);
-  }, [question.id, initialHasAnswered]);
+    if (question.id !== currentQuestionId) {
+      setCurrentQuestionId(question.id);
+      setSelectedLocation(null);
+      setError(null);
+      setHasAnswered(initialHasAnswered);
+      setAnswers([]);
+      setIsRevealing(false);
+      
+      // Reset map view
+      if (mapRef.current) {
+        mapRef.current.flyTo({
+          center: [0, 20],
+          zoom: 1.5,
+          duration: 1000
+        });
+      }
+    }
+  }, [question.id, currentQuestionId, initialHasAnswered]);
 
   // Subscribe to game status changes
   useEffect(() => {
