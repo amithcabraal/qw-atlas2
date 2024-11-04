@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { questions } from '../data/questions';
 import HostView from '../components/HostView';
 import PlayerView from '../components/PlayerView';
+import PlayerList from '../components/PlayerList';
 
 interface Player {
   id: string;
@@ -35,9 +36,9 @@ interface Answer {
 export default function PlayGame() {
   const { gameId } = useParams();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const role = searchParams.get('role');
   const playerId = searchParams.get('playerId');
+  const navigate = useNavigate();
 
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -87,7 +88,6 @@ export default function PlayGame() {
               filter: `id=eq.${gameId}`
             },
             (payload) => {
-              console.log('Game update:', payload);
               setGame(payload.new as Game);
             }
           )
@@ -100,7 +100,6 @@ export default function PlayGame() {
               filter: `game_id=eq.${gameId}`
             },
             (payload) => {
-              console.log('Players update:', payload);
               if (payload.eventType === 'UPDATE') {
                 setPlayers(current => 
                   current.map(p => 
@@ -124,7 +123,6 @@ export default function PlayGame() {
               filter: `game_id=eq.${gameId}`
             },
             (payload) => {
-              console.log('Answers update:', payload);
               if (payload.eventType === 'INSERT') {
                 setAnswers(current => [...current, payload.new as Answer]);
               }
@@ -132,7 +130,6 @@ export default function PlayGame() {
           );
 
         gameChannel.subscribe();
-
       } catch (err) {
         console.error('Error fetching game data:', err);
         setError('Failed to load game data');
@@ -188,10 +185,12 @@ export default function PlayGame() {
 
     try {
       // Update game status to revealing
-      await supabase
+      const { error: updateError } = await supabase
         .from('games')
         .update({ status: 'revealing' })
         .eq('id', gameId);
+
+      if (updateError) throw updateError;
 
       // Fetch all answers for current question
       const { data: answersData, error: answersError } = await supabase
