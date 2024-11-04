@@ -30,11 +30,6 @@ interface Player {
   initials: string;
 }
 
-interface Game {
-  status: 'waiting' | 'playing' | 'revealing' | 'finished';
-  current_question: number;
-}
-
 interface PlayerViewProps {
   gameId: string;
   playerId: string;
@@ -60,18 +55,15 @@ export default function PlayerView({
   const [currentQuestionId, setCurrentQuestionId] = useState(question.id);
   const mapRef = useRef<any>(null);
 
-  // Handle question changes and game status updates
+  // Reset state when game status changes
   useEffect(() => {
-    const questionChanged = question.id !== currentQuestionId;
-    const statusChanged = isRevealing !== (gameStatus === 'revealing');
-
-    if (questionChanged || statusChanged) {
-      setCurrentQuestionId(question.id);
+    if (gameStatus === 'playing') {
       setSelectedLocation(null);
       setError(null);
-      setHasAnswered(initialHasAnswered);
+      setHasAnswered(false);
       setAnswers([]);
-      setIsRevealing(gameStatus === 'revealing');
+      setIsRevealing(false);
+      setIsSubmitting(false);
       
       // Reset map view
       if (mapRef.current) {
@@ -81,13 +73,33 @@ export default function PlayerView({
           duration: 1000
         });
       }
+    } else if (gameStatus === 'revealing') {
+      setIsRevealing(true);
+      fetchAnswers();
+    }
+  }, [gameStatus]);
 
-      // If we're revealing answers, fetch them
-      if (gameStatus === 'revealing') {
-        fetchAnswers();
+  // Handle question changes
+  useEffect(() => {
+    if (question.id !== currentQuestionId) {
+      setCurrentQuestionId(question.id);
+      setSelectedLocation(null);
+      setError(null);
+      setHasAnswered(false);
+      setAnswers([]);
+      setIsRevealing(false);
+      setIsSubmitting(false);
+      
+      // Reset map view
+      if (mapRef.current) {
+        mapRef.current.flyTo({
+          center: [0, 20],
+          zoom: 1.5,
+          duration: 1000
+        });
       }
     }
-  }, [question.id, currentQuestionId, initialHasAnswered, gameStatus, isRevealing]);
+  }, [question.id, currentQuestionId]);
 
   const fetchAnswers = async () => {
     try {
@@ -134,7 +146,7 @@ export default function PlayerView({
   };
 
   const handleMapClick = (e: MapLayerMouseEvent) => {
-    if (hasAnswered || isSubmitting) return;
+    if (gameStatus !== 'playing' || hasAnswered || isSubmitting) return;
     
     const lng = e.lngLat?.lng;
     const lat = e.lngLat?.lat;
@@ -146,7 +158,7 @@ export default function PlayerView({
   };
 
   const handleSubmit = async () => {
-    if (!selectedLocation || hasAnswered || isSubmitting) return;
+    if (!selectedLocation || hasAnswered || isSubmitting || gameStatus !== 'playing') return;
 
     try {
       setIsSubmitting(true);
@@ -235,7 +247,7 @@ export default function PlayerView({
       <div className="h-[calc(100vh-24rem)] min-h-[300px] rounded-xl overflow-hidden shadow-lg">
         <MapComponent
           ref={mapRef}
-          onMapClick={hasAnswered ? undefined : handleMapClick}
+          onMapClick={gameStatus === 'playing' && !hasAnswered ? handleMapClick : undefined}
           markers={markers}
           showLabels={isRevealing}
           showMarkerLabels={isRevealing}
@@ -249,7 +261,7 @@ export default function PlayerView({
           </div>
         )}
         
-        {!hasAnswered && (
+        {gameStatus === 'playing' && !hasAnswered && (
           <button
             onClick={handleSubmit}
             disabled={!selectedLocation || isSubmitting}
@@ -260,7 +272,7 @@ export default function PlayerView({
           </button>
         )}
         
-        {hasAnswered && !isRevealing && (
+        {hasAnswered && gameStatus === 'playing' && (
           <div className="text-center text-white text-lg bg-blue-500/20 rounded-lg p-4">
             Answer submitted! Waiting for other players...
           </div>
