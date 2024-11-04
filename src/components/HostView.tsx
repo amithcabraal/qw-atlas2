@@ -67,10 +67,15 @@ export default function HostView({
     if (showingAnswers) {
       const relevantAnswers = propAnswers.filter(a => a.question_id === currentQuestion);
       setDisplayedAnswers(relevantAnswers);
-    } else {
-     // setDisplayedAnswers([]);
     }
   }, [propAnswers, showingAnswers, currentQuestion]);
+
+  // Auto-reveal answers when all players have submitted
+  useEffect(() => {
+    if (allPlayersAnswered && !showingAnswers && !isRevealing) {
+      handleReveal();
+    }
+  }, [allPlayersAnswered]);
 
   const markers = showingAnswers ? [
     { 
@@ -118,18 +123,6 @@ export default function HostView({
         <div>
           <QuestionCard question={question} showHint={true} />
           <div className="mt-4 space-y-4">
-            <button
-              onClick={handleReveal}
-              disabled={!allPlayersAnswered || showingAnswers || isRevealing}
-              className={`w-full py-3 px-4 ${
-                allPlayersAnswered && !showingAnswers
-                  ? 'bg-blue-600 hover:bg-blue-700'
-                  : 'bg-gray-600'
-              } text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2`}
-            >
-              <Eye className="w-5 h-5" />
-              {isRevealing ? 'Revealing...' : 'Reveal Answers'}
-            </button>
             {showingAnswers && (
               <button
                 onClick={handleNext}
