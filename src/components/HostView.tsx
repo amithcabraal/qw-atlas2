@@ -53,12 +53,14 @@ export default function HostView({
     setLocalPlayers(players);
   }, [players]);
 
-  // Update current answers when answers prop changes
+  // Update current answers when answers prop changes and showingAnswers is true
   useEffect(() => {
-    const filteredAnswers = answers.filter(a => a.question_id === question.id);
-    console.log('Filtered answers for question', question.id, ':', filteredAnswers);
-    setCurrentAnswers(filteredAnswers);
-  }, [answers, question.id]);
+    if (showingAnswers) {
+      const filteredAnswers = answers.filter(a => a.question_id === question.id);
+      console.log('Filtered answers for question', question.id, ':', filteredAnswers);
+      setCurrentAnswers(filteredAnswers);
+    }
+  }, [answers, question.id, showingAnswers]);
 
   // Set up real-time subscriptions
   useEffect(() => {
@@ -96,7 +98,7 @@ export default function HostView({
         },
         (payload) => {
           console.log('Answer update received:', payload);
-          if (payload.eventType === 'INSERT') {
+          if (payload.eventType === 'INSERT' && showingAnswers) {
             setCurrentAnswers(current => [...current, payload.new as Answer]);
           }
         }
@@ -110,10 +112,10 @@ export default function HostView({
       console.log('Cleaning up host view subscriptions');
       supabase.removeChannel(channel);
     };
-  }, [gameId, question.id]);
+  }, [gameId, question.id, showingAnswers]);
 
   // Prepare markers for the map
-  const markers = showingAnswers || currentAnswers.length > 0
+  const markers = showingAnswers
     ? [
         { 
           latitude: question.latitude, 
@@ -183,7 +185,7 @@ export default function HostView({
       <div className="h-[400px] rounded-xl overflow-hidden">
         <MapComponent 
           markers={markers} 
-          interactive={false}
+          interactive={true}
           showLabels={false}
           showMarkerLabels={true}
         />
