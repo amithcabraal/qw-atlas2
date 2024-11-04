@@ -38,7 +38,7 @@ export default function HostView({
   gameId,
   currentQuestion,
   players,
-  answers,
+  answers: propAnswers,
   onNextQuestion,
   onRevealAnswers
 }: HostViewProps) {
@@ -53,69 +53,14 @@ export default function HostView({
     setLocalPlayers(players);
   }, [players]);
 
-  // Update current answers when answers prop changes or showingAnswers changes
+  // Update current answers when props change
   useEffect(() => {
     if (showingAnswers) {
-      const filteredAnswers = answers.filter(a => a.question_id === question.id);
-      console.log('Setting current answers:', filteredAnswers);
-      setCurrentAnswers(filteredAnswers);
+      const relevantAnswers = propAnswers.filter(a => a.question_id === question.id);
+      console.log('Updating current answers:', relevantAnswers);
+      setCurrentAnswers(relevantAnswers);
     }
-  }, [answers, question.id, showingAnswers]);
-
-  // Set up real-time subscriptions
-  useEffect(() => {
-    console.log('Setting up host view subscriptions');
-    
-    const channel = supabase.channel(`host-view-${gameId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'players',
-          filter: `game_id=eq.${gameId}`
-        },
-        (payload) => {
-          console.log('Player update received:', payload);
-          if (payload.eventType === 'UPDATE') {
-            setLocalPlayers(current => 
-              current.map(p => 
-                p.id === payload.new.id ? { ...p, ...payload.new } : p
-              )
-            );
-          } else if (payload.eventType === 'INSERT') {
-            setLocalPlayers(current => [...current, payload.new as Player]);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'answers',
-          filter: `game_id=eq.${gameId}`
-        },
-        (payload) => {
-          console.log('Answer update received:', payload);
-          if (payload.eventType === 'INSERT' && showingAnswers) {
-            const newAnswer = payload.new as Answer;
-            if (newAnswer.question_id === question.id) {
-              setCurrentAnswers(current => [...current, newAnswer]);
-            }
-          }
-        }
-      );
-
-    channel.subscribe((status) => {
-      console.log('Host view subscription status:', status);
-    });
-
-    return () => {
-      console.log('Cleaning up host view subscriptions');
-      supabase.removeChannel(channel);
-    };
-  }, [gameId, question.id, showingAnswers]);
+  }, [propAnswers, question.id, showingAnswers]);
 
   // Prepare markers for the map
   const markers = showingAnswers
@@ -147,11 +92,11 @@ export default function HostView({
   };
 
   const handleReveal = async () => {
-    // First set the state
-    setShowingAnswers(true);
-    
     try {
-      // Then fetch all answers for the current question
+      // Set state first
+      setShowingAnswers(true);
+      
+      // Fetch all answers for the current question
       const { data: answersData, error: answersError } = await supabase
         .from('answers')
         .select('*')
@@ -165,10 +110,11 @@ export default function HostView({
         setCurrentAnswers(answersData);
       }
 
-      // Finally notify parent
+      // Notify parent
       onRevealAnswers();
     } catch (err) {
-      console.error('Error fetching answers:', err);
+      console.error('Error revealing answers:', err);
+      setShowingAnswers(false);
     }
   };
 
