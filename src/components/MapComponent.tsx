@@ -5,7 +5,12 @@ import { MapPin } from 'lucide-react';
 
 interface MapComponentProps {
   onMapClick?: (e: MapLayerMouseEvent) => void;
-  markers?: Array<{ longitude: number; latitude: number; color?: string }>;
+  markers?: Array<{ 
+    longitude: number; 
+    latitude: number; 
+    color?: string;
+    fill?: boolean;
+  }>;
   interactive?: boolean;
   showLabels?: boolean;
 }
@@ -55,9 +60,24 @@ export default function MapComponent({
             latitude={marker.latitude}
             anchor="bottom"
           >
-            <MapPin 
-              className={`w-6 h-6 ${marker.color || 'text-blue-500'} drop-shadow-lg transition-transform hover:scale-110`}
-            />
+            <div className={`
+              w-6 h-6 
+              ${marker.fill ? 'bg-current' : ''} 
+              ${marker.color || 'text-blue-500'} 
+              rounded-full 
+              shadow-lg 
+              transition-transform 
+              hover:scale-110
+              border-2
+              border-current
+              flex
+              items-center
+              justify-center
+            `}>
+              <MapPin 
+                className={`w-4 h-4 ${marker.fill ? 'text-white' : 'text-current'}`}
+              />
+            </div>
           </Marker>
         ))}
       </Map>
