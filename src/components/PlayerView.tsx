@@ -29,21 +29,23 @@ export default function PlayerView({
 }: PlayerViewProps) {
   const [selectedLocation, setSelectedLocation] = useState<[number, number] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Reset selected location when question changes
   useEffect(() => {
     setSelectedLocation(null);
+    setError(null);
   }, [question.id]);
 
   const handleMapClick = (e: MapLayerMouseEvent) => {
     if (hasAnswered || isSubmitting) return;
     
-    // Safe access to coordinates
     const lng = e.lngLat?.lng;
     const lat = e.lngLat?.lat;
     
     if (typeof lng === 'number' && typeof lat === 'number') {
       setSelectedLocation([lng, lat]);
+      setError(null);
     }
   };
 
@@ -52,6 +54,7 @@ export default function PlayerView({
 
     try {
       setIsSubmitting(true);
+      setError(null);
       const [longitude, latitude] = selectedLocation;
 
       const distance = calculateDistance(
@@ -64,18 +67,7 @@ export default function PlayerView({
       // Calculate score based on distance (max 1000 points, minimum 0)
       const score = Math.max(0, Math.floor(1000 * Math.exp(-distance / 1000)));
 
-      // First update player status
-      const { error: playerError } = await supabase
-        .from('players')
-        .update({ 
-          has_answered: true,
-          score: score 
-        })
-        .eq('id', playerId);
-
-      if (playerError) throw playerError;
-
-      // Then submit answer
+      // First submit answer
       const { error: answerError } = await supabase
         .from('answers')
         .insert({
@@ -90,8 +82,20 @@ export default function PlayerView({
 
       if (answerError) throw answerError;
 
+      // Then update player status
+      const { error: playerError } = await supabase
+        .from('players')
+        .update({ 
+          has_answered: true,
+          score: score 
+        })
+        .eq('id', playerId);
+
+      if (playerError) throw playerError;
+
     } catch (err) {
       console.error('Error submitting answer:', err);
+      setError('Failed to submit answer. Please try again.');
       // Revert player status if answer submission fails
       await supabase
         .from('players')
@@ -112,6 +116,11 @@ export default function PlayerView({
           showLabels={false}
         />
       </div>
+      {error && (
+        <div className="text-center text-red-400 bg-red-900/20 rounded-lg p-4">
+          {error}
+        </div>
+      )}
       {selectedLocation && !hasAnswered && (
         <button
           onClick={handleSubmit}
