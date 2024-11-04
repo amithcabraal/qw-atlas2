@@ -1,9 +1,18 @@
 import React, { useState } from 'react';
-import { Question } from '../types';
+import { MapLayerMouseEvent } from 'react-map-gl';
 import QuestionCard from './QuestionCard';
 import MapComponent from './MapComponent';
 import { supabase } from '../lib/supabase';
 import { calculateDistance } from '../lib/utils';
+
+interface Question {
+  id: number;
+  text: string;
+  latitude: number;
+  longitude: number;
+  image?: string;
+  hint?: string;
+}
 
 interface PlayerViewProps {
   gameId: string;
@@ -19,37 +28,61 @@ export default function PlayerView({
   hasAnswered
 }: PlayerViewProps) {
   const [selectedLocation, setSelectedLocation] = useState<[number, number] | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleMapClick = async (e: { lngLat: [number, number] }) => {
-    if (hasAnswered) return;
+  const handleMapClick = async (e: MapLayerMouseEvent) => {
+    if (hasAnswered || isSubmitting) return;
 
-    const [longitude, latitude] = e.lngLat;
+    const [longitude, latitude] = e.lngLat.toArray();
     setSelectedLocation([longitude, latitude]);
+  };
 
-    const distance = calculateDistance(
-      latitude,
-      longitude,
-      question.latitude,
-      question.longitude
-    );
+  const handleSubmit = async () => {
+    if (!selectedLocation || hasAnswered || isSubmitting) return;
 
-    // Calculate score based on distance (max 1000 points, minimum 0)
-    const score = Math.max(0, Math.floor(1000 * Math.exp(-distance / 1000)));
+    try {
+      setIsSubmitting(true);
+      const [longitude, latitude] = selectedLocation;
 
-    await supabase.from('answers').insert({
-      playerId,
-      gameId,
-      questionId: question.id,
-      latitude,
-      longitude,
-      distance,
-      score
-    });
+      const distance = calculateDistance(
+        latitude,
+        longitude,
+        question.latitude,
+        question.longitude
+      );
 
-    await supabase
-      .from('players')
-      .update({ hasAnswered: true, score: score })
-      .eq('id', playerId);
+      // Calculate score based on distance (max 1000 points, minimum 0)
+      const score = Math.max(0, Math.floor(1000 * Math.exp(-distance / 1000)));
+
+      // Submit answer
+      const { error: answerError } = await supabase.from('answers').insert({
+        player_id: playerId,
+        game_id: gameId,
+        question_id: question.id,
+        latitude,
+        longitude,
+        distance,
+        score
+      });
+
+      if (answerError) throw answerError;
+
+      // Update player status
+      const { error: playerError } = await supabase
+        .from('players')
+        .update({ 
+          has_answered: true, 
+          score: score 
+        })
+        .eq('id', playerId);
+
+      if (playerError) throw playerError;
+
+    } catch (err) {
+      console.error('Error submitting answer:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -59,10 +92,21 @@ export default function PlayerView({
         <MapComponent
           onMapClick={hasAnswered ? undefined : handleMapClick}
           markers={selectedLocation ? [{ longitude: selectedLocation[0], latitude: selectedLocation[1] }] : []}
+          showLabels={false}
         />
       </div>
+      {selectedLocation && !hasAnswered && (
+        <button
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 disabled:bg-green-800
+                   text-white rounded-lg font-medium transition-colors"
+        >
+          {isSubmitting ? 'Submitting...' : 'Submit Answer'}
+        </button>
+      )}
       {hasAnswered && (
-        <div className="text-center text-white text-lg">
+        <div className="text-center text-white text-lg bg-blue-500/20 rounded-lg p-4">
           Answer submitted! Waiting for other players...
         </div>
       )}
