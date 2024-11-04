@@ -4,7 +4,6 @@ import { Play, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import PlayerList from '../components/PlayerList';
 import ShareButton from '../components/ShareButton';
-import { useSupabaseSubscription } from '../hooks/useSupabaseSubscription';
 import { useGameSharing } from '../hooks/useGameSharing';
 
 interface Player {
@@ -28,6 +27,7 @@ export default function HostGame() {
   const [isLoading, setIsLoading] = useState(true);
   const { shareGame, copied } = useGameSharing();
 
+  // Create game and set up initial state
   useEffect(() => {
     const createGame = async () => {
       try {
@@ -51,25 +51,6 @@ export default function HostGame() {
         if (game) {
           setGameCode(code);
           setGameId(game.id);
-
-          // Set up real-time subscription for players
-          const playersSubscription = supabase
-            .channel(`players:${game.id}`)
-            .on('postgres_changes', {
-              event: '*',
-              schema: 'public',
-              table: 'players',
-              filter: `game_id=eq.${game.id}`
-            }, (payload) => {
-              if (payload.eventType === 'INSERT') {
-                setPlayers(current => [...current, payload.new as Player]);
-              }
-            })
-            .subscribe();
-
-          return () => {
-            playersSubscription.unsubscribe();
-          };
         } else {
           throw new Error('Failed to create game');
         }
@@ -83,6 +64,59 @@ export default function HostGame() {
 
     createGame();
   }, []);
+
+  // Set up real-time subscription and load initial players
+  useEffect(() => {
+    if (!gameId) return;
+
+    // Load initial players
+    const loadPlayers = async () => {
+      const { data: existingPlayers, error: playersError } = await supabase
+        .from('players')
+        .select('*')
+        .eq('game_id', gameId);
+
+      if (playersError) {
+        console.error('Error loading players:', playersError);
+        return;
+      }
+
+      if (existingPlayers) {
+        setPlayers(existingPlayers);
+      }
+    };
+
+    loadPlayers();
+
+    // Set up real-time subscription
+    const playersSubscription = supabase
+      .channel(`players:${gameId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'players',
+        filter: `game_id=eq.${gameId}`
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setPlayers(current => [...current, payload.new as Player]);
+        } else if (payload.eventType === 'UPDATE') {
+          setPlayers(current =>
+            current.map(player =>
+              player.id === payload.new.id ? { ...player, ...payload.new } : player
+            )
+          );
+        } else if (payload.eventType === 'DELETE') {
+          setPlayers(current =>
+            current.filter(player => player.id !== payload.old.id)
+          );
+        }
+      })
+      .subscribe();
+
+    return () => {
+      playersSubscription.unsubscribe();
+    };
+  }, [gameId]);
 
   const handleShare = async () => {
     if (!gameCode) {
