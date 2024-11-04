@@ -44,6 +44,7 @@ export default function HostView({
 }: HostViewProps) {
   const [showingAnswers, setShowingAnswers] = useState(false);
   const [displayedAnswers, setDisplayedAnswers] = useState<Answer[]>([]);
+  const [isRevealing, setIsRevealing] = useState(false);
   const question = questions[currentQuestion];
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
 
@@ -51,6 +52,7 @@ export default function HostView({
   useEffect(() => {
     setShowingAnswers(false);
     setDisplayedAnswers([]);
+    setIsRevealing(false);
   }, [currentQuestion]);
 
   // Update displayed answers when prop answers change and we're showing answers
@@ -84,10 +86,12 @@ export default function HostView({
   ] : [];
 
   const handleReveal = async () => {
-    if (!allPlayersAnswered || showingAnswers) return;
+    if (isRevealing) return;
 
     try {
-      // Set local state first
+      setIsRevealing(true);
+      
+      // Set local state
       setShowingAnswers(true);
       
       // Notify parent
@@ -110,6 +114,8 @@ export default function HostView({
       console.error('Error revealing answers:', err);
       setShowingAnswers(false);
       setDisplayedAnswers([]);
+    } finally {
+      setIsRevealing(false);
     }
   };
 
@@ -126,12 +132,16 @@ export default function HostView({
           <div className="space-y-4">
             <button
               onClick={handleReveal}
-              disabled={!allPlayersAnswered || showingAnswers}
+              disabled={!allPlayersAnswered || isRevealing}
               className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 
                        text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               <Eye className="w-5 h-5" />
-              {allPlayersAnswered ? 'Reveal Answers' : 'Waiting for all players...'}
+              {!allPlayersAnswered 
+                ? 'Waiting for all players...' 
+                : isRevealing 
+                  ? 'Revealing...' 
+                  : 'Reveal Answers'}
             </button>
             {showingAnswers && (
               <button
