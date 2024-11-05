@@ -5,44 +5,7 @@ import QuestionCard from './QuestionCard';
 import PlayerList from './PlayerList';
 import MapComponent from './MapComponent';
 
-interface Question {
-  id: number;
-  text: string;
-  latitude: number;
-  longitude: number;
-  image?: string;
-  hint?: string;
-}
-
-interface Player {
-  id: string;
-  initials: string;
-  game_id: string;
-  score: number;
-  has_answered: boolean;
-  lastScore?: number;
-}
-
-interface Answer {
-  id: string;
-  player_id: string;
-  game_id: string;
-  question_id: number;
-  latitude: number;
-  longitude: number;
-  distance: number;
-  score: number;
-}
-
-interface HostViewProps {
-  gameId: string;
-  currentQuestion: number;
-  players: Player[];
-  answers: Answer[];
-  onNextQuestion: () => void;
-  onRevealAnswers: () => void;
-  question: Question;
-}
+// ... [previous interfaces remain the same]
 
 export default function HostView({
   gameId,
@@ -61,7 +24,7 @@ export default function HostView({
   const mapRef = useRef<any>(null);
   
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
-  const isLastQuestion = currentQuestion === 5; // Since we're using 6 questions (0-5)
+  const isLastQuestion = currentQuestion === 5;
 
   useEffect(() => {
     setShowingAnswers(false);
@@ -83,16 +46,19 @@ export default function HostView({
   const revealAnswersSequentially = async () => {
     if (!mapRef.current || isAnimating) return;
 
+    // Get relevant answers for the current question
+    const relevantAnswers = propAnswers.filter(a => a.question_id === currentQuestion);
+
     console.log('Revealing answers for question:', {
       questionNumber: currentQuestion + 1,
       questionText: question.text,
       correctLocation: {
         latitude: question.latitude,
         longitude: question.longitude
-      }
+      },
+      totalAnswers: relevantAnswers.length,
+      answers: relevantAnswers
     });
-
-    console.log('Answers to reveal:', propAnswers.filter(a => a.question_id === currentQuestion));
 
     try {
       setIsAnimating(true);
@@ -124,16 +90,14 @@ export default function HostView({
 
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Filter and sort answers for current question
-      const relevantAnswers = propAnswers
-        .filter(a => a.question_id === currentQuestion)
-        .sort((a, b) => b.score - a.score);
+      // Sort answers by score
+      const sortedAnswers = [...relevantAnswers].sort((a, b) => b.score - a.score);
 
-      console.log('Starting to reveal player answers:', relevantAnswers.length);
+      console.log('Starting to reveal player answers:', sortedAnswers.length);
 
       // Reveal answers one by one
-      for (let i = 0; i < relevantAnswers.length; i++) {
-        const answer = relevantAnswers[i];
+      for (let i = 0; i < sortedAnswers.length; i++) {
+        const answer = sortedAnswers[i];
         const player = players.find(p => p.id === answer.player_id);
         console.log('Revealing answer for player:', {
           player: player?.initials,
@@ -172,6 +136,7 @@ export default function HostView({
       });
     } catch (error) {
       console.error('Animation error:', error);
+      setError('Failed to animate answers');
     } finally {
       setIsAnimating(false);
     }
