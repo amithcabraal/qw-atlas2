@@ -2,37 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { questions } from '../data/questions';
-import { useGameActions } from '../hooks/useGameActions';
+import { getRandomQuestions } from '../lib/gameUtils';
 import HostView from '../components/HostView';
 import PlayerView from '../components/PlayerView';
-import PlayerList from '../components/PlayerList';
+import GameComplete from '../components/GameComplete';
+import { useGameActions } from '../hooks/useGameActions';
 
-interface Player {
-  id: string;
-  initials: string;
-  game_id: string;
-  score: number;
-  has_answered: boolean;
-}
-
-interface Game {
-  id: string;
-  code: string;
-  status: 'waiting' | 'playing' | 'revealing' | 'finished';
-  current_question: number;
-  host_id: string;
-}
-
-interface Answer {
-  id: string;
-  player_id: string;
-  game_id: string;
-  question_id: number;
-  latitude: number;
-  longitude: number;
-  distance: number;
-  score: number;
-}
+// Get 6 random questions for the game
+const DEFAULT_QUESTIONS = getRandomQuestions(questions);
 
 export default function PlayGame() {
   const { gameId } = useParams();
@@ -41,20 +18,15 @@ export default function PlayGame() {
   const playerId = searchParams.get('playerId');
   const navigate = useNavigate();
 
-  const [game, setGame] = useState<Game | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [answers, setAnswers] = useState<Answer[]>([]);
-  const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
+  const [game, setGame] = useState<any>(null);
+  const [players, setPlayers] = useState<any[]>([]);
+  const [answers, setAnswers] = useState<any[]>([]);
+  const [currentPlayer, setCurrentPlayer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [gameQuestions, setGameQuestions] = useState(DEFAULT_QUESTIONS);
 
-  const { handleNextQuestion, handleRevealAnswers, error: gameActionError } = useGameActions(gameId, questions.length);
-
-  useEffect(() => {
-    if (gameActionError) {
-      setError(gameActionError);
-    }
-  }, [gameActionError]);
+  const { handleNextQuestion, handleRevealAnswers, error: actionError } = useGameActions(gameId, gameQuestions.length);
 
   useEffect(() => {
     const fetchGameData = async () => {
@@ -97,15 +69,8 @@ export default function PlayGame() {
               filter: `id=eq.${gameId}`
             },
             (payload) => {
-              const updatedGame = payload.new as Game;
+              const updatedGame = payload.new;
               setGame(updatedGame);
-              
-              // Reset player's answer status when moving to next question
-              if (updatedGame.status === 'playing' && currentPlayer) {
-                setCurrentPlayer(prev => prev ? { ...prev, has_answered: false } : null);
-                // Clear answers when moving to next question
-                setAnswers([]);
-              }
             }
           )
           .on(
@@ -141,7 +106,7 @@ export default function PlayGame() {
             },
             (payload) => {
               if (payload.eventType === 'INSERT') {
-                setAnswers(current => [...current, payload.new as Answer]);
+                setAnswers(current => [...current, payload.new]);
               }
             }
           );
@@ -169,10 +134,10 @@ export default function PlayGame() {
     );
   }
 
-  if (error) {
+  if (error || actionError) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-red-400 text-xl">{error}</div>
+        <div className="text-red-400 text-xl">{error || actionError}</div>
       </div>
     );
   }
@@ -186,20 +151,10 @@ export default function PlayGame() {
   }
 
   if (game.status === 'finished') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-xl p-8 shadow-xl">
-          <h1 className="text-3xl font-bold text-white text-center mb-6">Game Complete!</h1>
-          <PlayerList 
-            players={players} 
-            isGameComplete={true}
-          />
-        </div>
-      </div>
-    );
+    return <GameComplete players={players} />;
   }
 
-  const currentQuestionData = questions[game.current_question];
+  const currentQuestionData = gameQuestions[game.current_question];
   
   if (!currentQuestionData) {
     return (
@@ -218,6 +173,7 @@ export default function PlayGame() {
         answers={answers}
         onNextQuestion={() => handleNextQuestion(game.current_question)}
         onRevealAnswers={() => handleRevealAnswers(game.current_question)}
+        question={currentQuestionData}
       />
     );
   }
@@ -228,6 +184,7 @@ export default function PlayGame() {
         gameId={gameId}
         playerId={currentPlayer.id}
         question={currentQuestionData}
+        questionNumber={game.current_question}
         hasAnswered={currentPlayer.has_answered}
         gameStatus={game.status}
       />
