@@ -15,8 +15,7 @@ export const questions: Question[] = [
     hint: "This ancient wonder is located in Egypt",
     image: "https://images.unsplash.com/photo-1503177119275-0aa32b3a9368?auto=format&fit=crop&q=80"
   }
-  ]
-/*
+  ],
   {
     id: 3,
     text: "Locate Machu Picchu",
@@ -242,4 +241,4 @@ export const questions: Question[] = [
     image: "https://images.unsplash.com/photo-1596636478939-6d53d4f1dbae?auto=format&fit=crop&q=80"
   }
 ];
-*/
+
