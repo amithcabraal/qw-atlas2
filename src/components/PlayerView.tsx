@@ -34,6 +34,7 @@ interface PlayerViewProps {
   gameId: string;
   playerId: string;
   question: Question;
+  questionNumber: number;
   hasAnswered: boolean;
   gameStatus: 'waiting' | 'playing' | 'revealing' | 'finished';
 }
@@ -42,6 +43,7 @@ export default function PlayerView({
   gameId,
   playerId,
   question,
+  questionNumber,
   hasAnswered: initialHasAnswered,
   gameStatus
 }: PlayerViewProps) {
@@ -241,7 +243,10 @@ export default function PlayerView({
   return (
     <div className="min-h-screen flex flex-col max-w-3xl mx-auto px-4">
       <div className="flex-none py-4">
-        <QuestionCard question={question} />
+        <QuestionCard 
+          question={question} 
+          questionNumber={questionNumber}
+        />
       </div>
       
       <div className="h-[calc(100vh-24rem)] min-h-[300px] rounded-xl overflow-hidden shadow-lg">
