@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { questions } from '../data/questions';
+import { getRandomQuestions } from '../lib/gameUtils';
 import PlayerList from '../components/PlayerList';
 import ShareButton from '../components/ShareButton';
 import { useGameSharing } from '../hooks/useGameSharing';
@@ -34,6 +36,7 @@ export default function HostGame() {
         setIsLoading(true);
         const code = generateGameCode();
         const hostId = crypto.randomUUID();
+        const gameQuestions = getRandomQuestions(questions);
         
         console.log('Creating new game with code:', code);
         
@@ -43,7 +46,8 @@ export default function HostGame() {
             code,
             status: 'waiting',
             current_question: 0,
-            host_id: hostId
+            host_id: hostId,
+            questions: gameQuestions // Store the selected questions in the game record
           })
           .select()
           .single();
