@@ -27,7 +27,7 @@ const DEFAULT_VIEW_STATE = {
 };
 
 const MAP_STYLES = {
-  satellite: "mapbox://styles/mapbox/satellite-streets-v12",
+  satellite: "mapbox://styles/mapbox/satellite-v9", // Changed to remove streets overlay
   dark: "mapbox://styles/mapbox/dark-v11"
 };
 
@@ -131,6 +131,26 @@ const MapComponent = forwardRef<any, MapComponentProps>(({
       });
     }
   }, [markers, mapLoaded]);
+
+  // Hide labels when map loads if not in reveal mode
+  useEffect(() => {
+    if (mapRef.current && mapLoaded && !showLabels) {
+      const map = mapRef.current;
+      const layers = map.getStyle().layers;
+      
+      // Hide all label and boundary layers
+      layers.forEach((layer: any) => {
+        if (
+          layer.id.includes('label') || 
+          layer.id.includes('text') ||
+          layer.id.includes('boundary') ||
+          layer.id.includes('border')
+        ) {
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+        }
+      });
+    }
+  }, [mapLoaded, showLabels]);
 
   if (!MAPBOX_TOKEN) {
     console.error('Mapbox token not found');
