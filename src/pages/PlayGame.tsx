@@ -179,12 +179,18 @@ export default function PlayGame() {
   }
 
   // Get current question from the game's questions array
-  const currentQuestionData = game.questions[game.current_question];
+  const currentQuestionData = game.questions?.[game.current_question];
   
+  // Handle the case where we've completed all questions
+  if (!currentQuestionData && game.current_question >= game.questions?.length) {
+    return <GameComplete players={players} />;
+  }
+
+  // Handle invalid question state
   if (!currentQuestionData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-white text-xl">Invalid question state</div>
+        <div className="text-white text-xl">Loading next question...</div>
       </div>
     );
   }
