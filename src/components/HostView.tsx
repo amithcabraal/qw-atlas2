@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase';
 import QuestionCard from './QuestionCard';
 import PlayerList from './PlayerList';
 import MapComponent from './MapComponent';
-import { questions } from '../data/questions';
 
 interface Question {
   id: number;
@@ -42,6 +41,7 @@ interface HostViewProps {
   answers: Answer[];
   onNextQuestion: () => void;
   onRevealAnswers: () => void;
+  question: Question;
 }
 
 export default function HostView({
@@ -50,7 +50,8 @@ export default function HostView({
   players,
   answers: propAnswers,
   onNextQuestion,
-  onRevealAnswers
+  onRevealAnswers,
+  question
 }: HostViewProps) {
   const [showingAnswers, setShowingAnswers] = useState(false);
   const [displayedAnswers, setDisplayedAnswers] = useState<Answer[]>([]);
@@ -59,9 +60,8 @@ export default function HostView({
   const [error, setError] = useState<string | null>(null);
   const mapRef = useRef<any>(null);
   
-  const question = questions[currentQuestion];
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
-  const isLastQuestion = currentQuestion === questions.length - 1;
+  const isLastQuestion = currentQuestion === 5; // Since we're using 6 questions (0-5)
 
   useEffect(() => {
     setShowingAnswers(false);
@@ -141,16 +141,6 @@ export default function HostView({
     }
   };
 
-  const handleNext = async () => {
-    try {
-      setError(null);
-      await onNextQuestion();
-    } catch (err) {
-      console.error('Error moving to next question:', err);
-      setError('Failed to move to next question');
-    }
-  };
-
   const markers = showingAnswers ? [
     { 
       latitude: question.latitude, 
@@ -180,7 +170,11 @@ export default function HostView({
       )}
       <div className="grid md:grid-cols-2 gap-6">
         <div>
-          <QuestionCard question={question} showHint={true} />
+          <QuestionCard 
+            question={question} 
+            questionNumber={currentQuestion}
+            showHint={true} 
+          />
           <div className="mt-4 space-y-4">
             {allPlayersAnswered && !showingAnswers && (
               <button
@@ -195,7 +189,7 @@ export default function HostView({
             )}
             {showingAnswers && (
               <button
-                onClick={handleNext}
+                onClick={onNextQuestion}
                 className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 
                          text-white rounded-lg font-medium transition-colors 
                          flex items-center justify-center gap-2"
