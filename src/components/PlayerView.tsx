@@ -55,6 +55,7 @@ export default function PlayerView({
   const [players, setPlayers] = useState<Record<string, Player>>({});
   const [isRevealing, setIsRevealing] = useState(gameStatus === 'revealing');
   const [currentQuestionId, setCurrentQuestionId] = useState(question.id);
+  const [mapKey, setMapKey] = useState(0);
   const mapRef = useRef<any>(null);
 
   // Reset state when game status changes
@@ -67,14 +68,8 @@ export default function PlayerView({
       setIsRevealing(false);
       setIsSubmitting(false);
       
-      // Reset map view
-      if (mapRef.current) {
-        mapRef.current.flyTo({
-          center: [0, 20],
-          zoom: 1.5,
-          duration: 1000
-        });
-      }
+      // Force map remount
+      setMapKey(prev => prev + 1);
     } else if (gameStatus === 'revealing') {
       setIsRevealing(true);
       fetchAnswers();
@@ -83,24 +78,43 @@ export default function PlayerView({
 
   // Handle question changes
   useEffect(() => {
-    if (question.id !== currentQuestionId) {
-      setCurrentQuestionId(question.id);
-      setSelectedLocation(null);
-      setError(null);
-      setHasAnswered(false);
-      setAnswers([]);
-      setIsRevealing(false);
-      setIsSubmitting(false);
-      
-      // Reset map view
-      if (mapRef.current) {
-        mapRef.current.flyTo({
-          center: [0, 20],
-          zoom: 1.5,
-          duration: 1000
-        });
+    const resetView = async () => {
+      if (question.id !== currentQuestionId) {
+        setCurrentQuestionId(question.id);
+        setSelectedLocation(null);
+        setError(null);
+        setHasAnswered(false);
+        setAnswers([]);
+        setIsRevealing(false);
+        setIsSubmitting(false);
+        
+        // Force map remount
+        setMapKey(prev => prev + 1);
+
+        // Wait for map to mount
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (mapRef.current) {
+          // Zoom out
+          mapRef.current.flyTo({
+            zoom: 0,
+            duration: 1000
+          });
+          
+          // Wait for zoom out
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Zoom back in to world view
+          mapRef.current.flyTo({
+            center: [0, 20],
+            zoom: 1.5,
+            duration: 1000
+          });
+        }
       }
-    }
+    };
+
+    resetView();
   }, [question.id, currentQuestionId]);
 
   const fetchAnswers = async () => {
@@ -252,10 +266,12 @@ export default function PlayerView({
       <div className="h-[calc(100vh-24rem)] min-h-[300px] rounded-xl overflow-hidden shadow-lg">
         <MapComponent
           ref={mapRef}
+          key={mapKey}
           onMapClick={gameStatus === 'playing' && !hasAnswered ? handleMapClick : undefined}
           markers={markers}
           showLabels={isRevealing}
           showMarkerLabels={isRevealing}
+          interactive={!isSubmitting}
         />
       </div>
 
