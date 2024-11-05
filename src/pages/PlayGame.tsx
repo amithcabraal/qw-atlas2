@@ -1,15 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { questions } from '../data/questions';
-import { getRandomQuestions } from '../lib/gameUtils';
 import HostView from '../components/HostView';
 import PlayerView from '../components/PlayerView';
 import GameComplete from '../components/GameComplete';
 import { useGameActions } from '../hooks/useGameActions';
-
-// Get 6 random questions for the game
-const DEFAULT_QUESTIONS = getRandomQuestions(questions);
 
 export default function PlayGame() {
   const { gameId } = useParams();
@@ -24,9 +19,8 @@ export default function PlayGame() {
   const [currentPlayer, setCurrentPlayer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [gameQuestions, setGameQuestions] = useState(DEFAULT_QUESTIONS);
 
-  const { handleNextQuestion, handleRevealAnswers, error: actionError } = useGameActions(gameId, gameQuestions.length);
+  const { handleNextQuestion, handleRevealAnswers, error: actionError } = useGameActions(gameId);
 
   useEffect(() => {
     const fetchGameData = async () => {
@@ -154,7 +148,7 @@ export default function PlayGame() {
     return <GameComplete players={players} />;
   }
 
-  const currentQuestionData = gameQuestions[game.current_question];
+  const currentQuestionData = game.questions[game.current_question];
   
   if (!currentQuestionData) {
     return (
