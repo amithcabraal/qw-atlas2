@@ -26,9 +26,12 @@ const DEFAULT_VIEW_STATE = {
   pitch: 0
 };
 
+// Using specific styles for different game states
 const MAP_STYLES = {
-  satellite: "mapbox://styles/mapbox/satellite-v9", // Changed to remove streets overlay
-  dark: "mapbox://styles/mapbox/dark-v11"
+  // Pure satellite imagery without labels
+  satellite: "mapbox://styles/mapbox/satellite-v9",
+  // Dark style with labels for reveal state
+  dark: "mapbox://styles/mapbox/navigation-night-v1"
 };
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -48,7 +51,7 @@ const MapComponent = forwardRef<any, MapComponentProps>(({
   useEffect(() => {
     if (mapRef.current && mapLoaded) {
       const refreshTiles = () => {
-        const map = mapRef.current;
+        const map = mapRef.current.getMap();
         if (!map) return;
 
         // Store current view state
@@ -90,67 +93,75 @@ const MapComponent = forwardRef<any, MapComponentProps>(({
   useImperativeHandle(ref, () => ({
     flyTo: (options: any) => {
       if (mapRef.current && mapLoaded) {
-        mapRef.current.flyTo({
-          ...options,
-          essential: true
-        });
+        const map = mapRef.current.getMap();
+        if (map) {
+          map.flyTo({
+            ...options,
+            essential: true
+          });
+        }
       }
     },
     resetView: () => {
       if (mapRef.current && mapLoaded) {
-        mapRef.current.flyTo({
-          ...DEFAULT_VIEW_STATE,
-          duration: 0,
-          essential: true
-        });
+        const map = mapRef.current.getMap();
+        if (map) {
+          map.flyTo({
+            ...DEFAULT_VIEW_STATE,
+            duration: 0,
+            essential: true
+          });
+        }
       }
     }
   }));
 
+  // Handle style changes based on showLabels prop
   useEffect(() => {
     const newStyle = showLabels ? MAP_STYLES.dark : MAP_STYLES.satellite;
-    if (mapRef.current && mapLoaded && currentStyle !== newStyle) {
+    if (currentStyle !== newStyle) {
       setCurrentStyle(newStyle);
+      // Reset map when style changes
+      if (mapRef.current && mapLoaded) {
+        const map = mapRef.current.getMap();
+        if (map) {
+          map.once('style.load', () => {
+            map.flyTo({
+              ...DEFAULT_VIEW_STATE,
+              duration: 1000,
+              essential: true
+            });
+          });
+        }
+      }
     }
   }, [showLabels, mapLoaded]);
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (mapRef.current) {
-        mapRef.current.remove();
+        const map = mapRef.current.getMap();
+        if (map) {
+          map.remove();
+        }
       }
     };
   }, []);
 
+  // Reset view when markers are cleared
   useEffect(() => {
     if (mapRef.current && mapLoaded && markers.length === 0) {
-      mapRef.current.flyTo({
-        ...DEFAULT_VIEW_STATE,
-        duration: 1000,
-        essential: true
-      });
+      const map = mapRef.current.getMap();
+      if (map) {
+        map.flyTo({
+          ...DEFAULT_VIEW_STATE,
+          duration: 1000,
+          essential: true
+        });
+      }
     }
   }, [markers, mapLoaded]);
-
-  // Hide labels when map loads if not in reveal mode
-  useEffect(() => {
-    if (mapRef.current && mapLoaded && !showLabels) {
-      const map = mapRef.current;
-      const layers = map.getStyle().layers;
-      
-      // Hide all label and boundary layers
-      layers.forEach((layer: any) => {
-        if (
-          layer.id.includes('label') || 
-          layer.id.includes('text') ||
-          layer.id.includes('boundary') ||
-          layer.id.includes('border')
-        ) {
-          map.setLayoutProperty(layer.id, 'visibility', 'none');
-        }
-      });
-    }
-  }, [mapLoaded, showLabels]);
 
   if (!MAPBOX_TOKEN) {
     console.error('Mapbox token not found');
