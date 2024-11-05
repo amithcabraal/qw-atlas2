@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle } from 'react';
 import Map, { Marker, MapLayerMouseEvent } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapPin } from 'lucide-react';
@@ -15,9 +15,18 @@ interface MapComponentProps {
   interactive?: boolean;
   showLabels?: boolean;
   showMarkerLabels?: boolean;
+  key?: string; // Add key prop for forced remount
 }
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+
+const DEFAULT_VIEW_STATE = {
+  longitude: 0,
+  latitude: 20,
+  zoom: 1.5,
+  bearing: 0,
+  pitch: 0
+};
 
 const MapComponent = forwardRef<any, MapComponentProps>(({ 
   onMapClick, 
@@ -26,6 +35,34 @@ const MapComponent = forwardRef<any, MapComponentProps>(({
   showLabels = false,
   showMarkerLabels = false
 }, ref) => {
+  const mapRef = React.useRef<any>(null);
+
+  useImperativeHandle(ref, () => ({
+    flyTo: (options: any) => {
+      if (mapRef.current) {
+        mapRef.current.flyTo(options);
+      }
+    },
+    resetView: () => {
+      if (mapRef.current) {
+        mapRef.current.flyTo({
+          ...DEFAULT_VIEW_STATE,
+          duration: 0
+        });
+      }
+    }
+  }));
+
+  useEffect(() => {
+    // Reset map when markers change
+    if (mapRef.current && markers.length === 0) {
+      mapRef.current.flyTo({
+        ...DEFAULT_VIEW_STATE,
+        duration: 0
+      });
+    }
+  }, [markers]);
+
   if (!MAPBOX_TOKEN) {
     console.error('Mapbox token not found');
     return (
@@ -38,13 +75,9 @@ const MapComponent = forwardRef<any, MapComponentProps>(({
   return (
     <div className="relative w-full h-full">
       <Map
-        ref={ref}
+        ref={mapRef}
         mapboxAccessToken={MAPBOX_TOKEN}
-        initialViewState={{
-          longitude: 0,
-          latitude: 20,
-          zoom: 1.5
-        }}
+        initialViewState={DEFAULT_VIEW_STATE}
         style={{ width: '100%', height: '100%' }}
         mapStyle={showLabels ? 
           "mapbox://styles/mapbox/dark-v11" : 
@@ -56,10 +89,11 @@ const MapComponent = forwardRef<any, MapComponentProps>(({
         cursor={onMapClick ? 'crosshair' : 'grab'}
         renderWorldCopies={true}
         maxBounds={[[-180, -85], [180, 85]]}
+        reuseMaps={false}
       >
         {markers.map((marker, index) => (
           <Marker
-            key={index}
+            key={`${marker.latitude}-${marker.longitude}-${index}`}
             longitude={marker.longitude}
             latitude={marker.latitude}
             anchor="bottom"
