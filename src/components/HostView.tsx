@@ -5,7 +5,44 @@ import QuestionCard from './QuestionCard';
 import PlayerList from './PlayerList';
 import MapComponent from './MapComponent';
 
-// ... [previous interfaces remain the same]
+interface Question {
+  id: number;
+  text: string;
+  latitude: number;
+  longitude: number;
+  image?: string;
+  hint?: string;
+}
+
+interface Player {
+  id: string;
+  initials: string;
+  game_id: string;
+  score: number;
+  has_answered: boolean;
+  lastScore?: number;
+}
+
+interface Answer {
+  id: string;
+  player_id: string;
+  game_id: string;
+  question_id: number;
+  latitude: number;
+  longitude: number;
+  distance: number;
+  score: number;
+}
+
+interface HostViewProps {
+  gameId: string;
+  currentQuestion: number;
+  players: Player[];
+  answers: Answer[];
+  onNextQuestion: () => void;
+  onRevealAnswers: () => void;
+  question: Question;
+}
 
 export default function HostView({
   gameId,
@@ -27,6 +64,13 @@ export default function HostView({
   const isLastQuestion = currentQuestion === 5;
 
   useEffect(() => {
+    console.log('Current question changed:', {
+      currentQuestion,
+      questionId: question.id,
+      totalAnswers: propAnswers.length,
+      answers: propAnswers
+    });
+
     setShowingAnswers(false);
     setDisplayedAnswers([]);
     setIsAnimating(false);
@@ -35,7 +79,7 @@ export default function HostView({
       ...player,
       lastScore: player.score
     })));
-  }, [currentQuestion]);
+  }, [currentQuestion, question.id, propAnswers]);
 
   useEffect(() => {
     if (showingAnswers) {
@@ -47,21 +91,24 @@ export default function HostView({
     if (!mapRef.current || isAnimating) return;
 
     // Get relevant answers for the current question
-    const relevantAnswers = propAnswers.filter(a => a.question_id === currentQuestion);
+    const relevantAnswers = propAnswers.filter(a => a.question_id === question.id - 1);
 
     console.log('Revealing answers for question:', {
       questionNumber: currentQuestion + 1,
+      questionId: question.id,
       questionText: question.text,
       correctLocation: {
         latitude: question.latitude,
         longitude: question.longitude
       },
       totalAnswers: relevantAnswers.length,
-      answers: relevantAnswers
+      answers: relevantAnswers,
+      allAnswers: propAnswers
     });
 
     try {
       setIsAnimating(true);
+      setDisplayedAnswers([]); // Clear any existing markers
 
       // First, fly to the correct location
       console.log('Flying to correct location');
@@ -80,7 +127,7 @@ export default function HostView({
         id: 'correct',
         player_id: 'correct',
         game_id: gameId,
-        question_id: currentQuestion,
+        question_id: question.id - 1,
         latitude: question.latitude,
         longitude: question.longitude,
         distance: 0,
@@ -93,7 +140,14 @@ export default function HostView({
       // Sort answers by score
       const sortedAnswers = [...relevantAnswers].sort((a, b) => b.score - a.score);
 
-      console.log('Starting to reveal player answers:', sortedAnswers.length);
+      console.log('Starting to reveal player answers:', {
+        totalAnswers: sortedAnswers.length,
+        answers: sortedAnswers.map(a => ({
+          playerId: a.player_id,
+          score: a.score,
+          location: { lat: a.latitude, lng: a.longitude }
+        }))
+      });
 
       // Reveal answers one by one
       for (let i = 0; i < sortedAnswers.length; i++) {
@@ -159,29 +213,25 @@ export default function HostView({
   };
 
   // Calculate markers based on current state
-  const markers = showingAnswers ? [
-    // Correct location marker
-    ...(displayedAnswers.some(a => a.player_id === 'correct') ? [{
-      latitude: question.latitude,
-      longitude: question.longitude,
-      color: 'text-green-500',
+  const markers = showingAnswers ? displayedAnswers.map(answer => {
+    if (answer.player_id === 'correct') {
+      return {
+        latitude: answer.latitude,
+        longitude: answer.longitude,
+        color: 'text-green-500',
+        fill: true,
+        label: 'Correct Location'
+      };
+    }
+    const player = players.find(p => p.id === answer.player_id);
+    return {
+      latitude: answer.latitude,
+      longitude: answer.longitude,
+      color: 'text-red-500',
       fill: true,
-      label: 'Correct Location'
-    }] : []),
-    // Player answer markers
-    ...displayedAnswers
-      .filter(a => a.player_id !== 'correct')
-      .map(answer => {
-        const player = players.find(p => p.id === answer.player_id);
-        return {
-          latitude: answer.latitude,
-          longitude: answer.longitude,
-          color: 'text-red-500',
-          fill: true,
-          label: `${player?.initials || 'Unknown'} (${answer.score} pts)`
-        };
-      })
-  ] : [];
+      label: `${player?.initials || 'Unknown'} (${answer.score} pts)`
+    };
+  }) : [];
 
   return (
     <div className="container mx-auto max-w-4xl p-4 space-y-6">
