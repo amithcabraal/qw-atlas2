@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import HostView from '../components/HostView';
 import PlayerView from '../components/PlayerView';
@@ -11,7 +11,6 @@ export default function PlayGame() {
   const [searchParams] = useSearchParams();
   const role = searchParams.get('role');
   const playerId = searchParams.get('playerId');
-  const navigate = useNavigate();
 
   const [game, setGame] = useState<any>(null);
   const [players, setPlayers] = useState<any[]>([]);
@@ -52,6 +51,19 @@ export default function PlayGame() {
           setCurrentPlayer(player);
         }
 
+        // Fetch answers for current question if game is in revealing state
+        if (gameData.status === 'revealing') {
+          const { data: answersData } = await supabase
+            .from('answers')
+            .select()
+            .eq('game_id', gameId)
+            .eq('question_id', gameData.current_question);
+          
+          if (answersData) {
+            setAnswers(answersData);
+          }
+        }
+
         // Set up real-time subscriptions
         const gameChannel = supabase.channel(`game-${gameId}`)
           .on(
@@ -62,9 +74,27 @@ export default function PlayGame() {
               table: 'games',
               filter: `id=eq.${gameId}`
             },
-            (payload) => {
+            async (payload) => {
               const updatedGame = payload.new;
               setGame(updatedGame);
+
+              // Clear answers when moving to next question
+              if (updatedGame.status === 'playing') {
+                setAnswers([]);
+              }
+
+              // Fetch new answers when revealing
+              if (updatedGame.status === 'revealing') {
+                const { data: newAnswers } = await supabase
+                  .from('answers')
+                  .select()
+                  .eq('game_id', gameId)
+                  .eq('question_id', updatedGame.current_question);
+                
+                if (newAnswers) {
+                  setAnswers(newAnswers);
+                }
+              }
             }
           )
           .on(
@@ -148,6 +178,7 @@ export default function PlayGame() {
     return <GameComplete players={players} />;
   }
 
+  // Get current question from the game's questions array
   const currentQuestionData = game.questions[game.current_question];
   
   if (!currentQuestionData) {
