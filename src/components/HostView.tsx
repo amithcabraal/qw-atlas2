@@ -58,6 +58,7 @@ export default function HostView({
   const [isRevealing, setIsRevealing] = useState(false);
   const [playersWithScores, setPlayersWithScores] = useState<Player[]>(players);
   const [error, setError] = useState<string | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
   const mapRef = useRef<any>(null);
   
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
@@ -68,6 +69,7 @@ export default function HostView({
     setDisplayedAnswers([]);
     setIsRevealing(false);
     setError(null);
+    setIsAnimating(false);
     setPlayersWithScores(players.map(player => ({
       ...player,
       lastScore: player.score
@@ -75,55 +77,77 @@ export default function HostView({
   }, [currentQuestion]);
 
   useEffect(() => {
-    if (showingAnswers) {
+    if (showingAnswers && !isAnimating) {
       revealAnswersSequentially();
     }
-  }, [showingAnswers]);
+  }, [showingAnswers, isAnimating]);
 
   const revealAnswersSequentially = async () => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || isAnimating) return;
 
-    // First, fly to the correct location
-    mapRef.current.flyTo({
-      center: [question.longitude, question.latitude],
-      zoom: 5,
-      duration: 2000
-    });
+    try {
+      setIsAnimating(true);
 
-    // Wait for the fly animation
-    await new Promise(resolve => setTimeout(resolve, 2000));
+      // First, fly to the correct location
+      mapRef.current.flyTo({
+        center: [question.longitude, question.latitude],
+        zoom: 5,
+        duration: 2000
+      });
 
-    // Filter answers for current question
-    const relevantAnswers = propAnswers
-      .filter(a => a.question_id === currentQuestion)
-      .sort((a, b) => b.score - a.score); // Sort by score, highest first
+      // Wait for the fly animation
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Reveal answers one by one
-    for (let i = 0; i < relevantAnswers.length; i++) {
-      const answer = relevantAnswers[i];
-      const isTopScore = i < 3; // Top 3 scores
-      const delay = isTopScore ? 1000 : 500;
+      // Show the correct answer marker
+      setDisplayedAnswers([{
+        id: 'correct',
+        player_id: 'correct',
+        game_id: gameId,
+        question_id: currentQuestion,
+        latitude: question.latitude,
+        longitude: question.longitude,
+        distance: 0,
+        score: 1000
+      }]);
 
-      // For top scores, adjust the map view
-      if (isTopScore) {
-        mapRef.current.flyTo({
-          center: [answer.longitude, answer.latitude],
-          zoom: 4,
-          duration: 1000
-        });
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Filter and sort answers for current question
+      const relevantAnswers = propAnswers
+        .filter(a => a.question_id === currentQuestion)
+        .sort((a, b) => b.score - a.score);
+
+      // Reveal answers one by one
+      for (let i = 0; i < relevantAnswers.length; i++) {
+        const answer = relevantAnswers[i];
+        const isTopScore = i < 3;
+        const delay = isTopScore ? 1000 : 500;
+
+        // For top scores, adjust the map view
+        if (isTopScore) {
+          mapRef.current.flyTo({
+            center: [answer.longitude, answer.latitude],
+            zoom: 4,
+            duration: 1000
+          });
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        setDisplayedAnswers(prev => [...prev, answer]);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
 
-      setDisplayedAnswers(prev => [...prev, answer]);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      // Finally, show the full view
+      mapRef.current.flyTo({
+        center: [question.longitude, question.latitude],
+        zoom: 3,
+        duration: 1500
+      });
+    } catch (error) {
+      console.error('Animation error:', error);
+    } finally {
+      setIsAnimating(false);
     }
-
-    // Finally, show the full view
-    mapRef.current.flyTo({
-      center: [question.longitude, question.latitude],
-      zoom: 3,
-      duration: 1500
-    });
   };
 
   const handleReveal = async () => {
@@ -150,16 +174,18 @@ export default function HostView({
       fill: true,
       label: 'Correct Location'
     },
-    ...displayedAnswers.map(answer => {
-      const player = players.find(p => p.id === answer.player_id);
-      return {
-        latitude: answer.latitude,
-        longitude: answer.longitude,
-        color: 'text-red-500',
-        fill: true,
-        label: `${player?.initials || 'Unknown'} (${answer.score} pts)`
-      };
-    })
+    ...displayedAnswers
+      .filter(a => a.player_id !== 'correct')
+      .map(answer => {
+        const player = players.find(p => p.id === answer.player_id);
+        return {
+          latitude: answer.latitude,
+          longitude: answer.longitude,
+          color: 'text-red-500',
+          fill: true,
+          label: `${player?.initials || 'Unknown'} (${answer.score} pts)`
+        };
+      })
   ] : [];
 
   return (
@@ -180,15 +206,17 @@ export default function HostView({
             {allPlayersAnswered && !showingAnswers && (
               <button
                 onClick={handleReveal}
+                disabled={isAnimating}
                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 
                          text-white rounded-lg font-medium transition-colors 
-                         flex items-center justify-center gap-2"
+                         flex items-center justify-center gap-2
+                         disabled:bg-blue-800 disabled:cursor-not-allowed"
               >
                 <Eye className="w-5 h-5" />
                 Reveal Answers
               </button>
             )}
-            {showingAnswers && (
+            {showingAnswers && !isAnimating && (
               <button
                 onClick={onNextQuestion}
                 className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 
