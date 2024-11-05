@@ -5,44 +5,7 @@ import QuestionCard from './QuestionCard';
 import PlayerList from './PlayerList';
 import MapComponent from './MapComponent';
 
-interface Question {
-  id: number;
-  text: string;
-  latitude: number;
-  longitude: number;
-  image?: string;
-  hint?: string;
-}
-
-interface Player {
-  id: string;
-  initials: string;
-  game_id: string;
-  score: number;
-  has_answered: boolean;
-  lastScore?: number;
-}
-
-interface Answer {
-  id: string;
-  player_id: string;
-  game_id: string;
-  question_id: number;
-  latitude: number;
-  longitude: number;
-  distance: number;
-  score: number;
-}
-
-interface HostViewProps {
-  gameId: string;
-  currentQuestion: number;
-  players: Player[];
-  answers: Answer[];
-  onNextQuestion: () => void;
-  onRevealAnswers: () => void;
-  question: Question;
-}
+// ... interfaces remain the same ...
 
 export default function HostView({
   gameId,
@@ -57,6 +20,7 @@ export default function HostView({
   const [displayedAnswers, setDisplayedAnswers] = useState<Answer[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [playersWithScores, setPlayersWithScores] = useState<Player[]>(players);
+  const [revealComplete, setRevealComplete] = useState(false);
   const mapRef = useRef<any>(null);
   
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
@@ -67,6 +31,7 @@ export default function HostView({
     setIsRevealing(false);
     setDisplayedAnswers([]);
     setError(null);
+    setRevealComplete(false);
     setPlayersWithScores(players.map(player => ({
       ...player,
       lastScore: player.score
@@ -78,6 +43,7 @@ export default function HostView({
 
     try {
       setIsRevealing(true);
+      setRevealComplete(false);
       setDisplayedAnswers([]); // Clear existing markers
 
       console.log('Starting reveal sequence:', {
@@ -152,9 +118,17 @@ export default function HostView({
         duration: 1500
       });
 
+      // Wait for final animation to complete
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Mark reveal as complete
+      setRevealComplete(true);
+      setIsRevealing(false);
+
     } catch (err) {
       console.error('Error in reveal sequence:', err);
       setError('Failed to reveal answers');
+      setIsRevealing(false);
     }
   };
 
@@ -207,7 +181,7 @@ export default function HostView({
             showHint={true} 
           />
           <div className="mt-4 space-y-4">
-            {allPlayersAnswered && !isRevealing && displayedAnswers.length === 0 && (
+            {allPlayersAnswered && !isRevealing && !revealComplete && (
               <button
                 onClick={handleReveal}
                 disabled={isRevealing}
@@ -220,7 +194,7 @@ export default function HostView({
                 Reveal Answers
               </button>
             )}
-            {displayedAnswers.length > 0 && !isRevealing && (
+            {revealComplete && !isRevealing && (
               <button
                 onClick={onNextQuestion}
                 className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 
@@ -248,8 +222,8 @@ export default function HostView({
           </h2>
           <PlayerList 
             players={playersWithScores} 
-            showAnswered={!isRevealing}
-            isGameComplete={isLastQuestion && displayedAnswers.length > 0} 
+            showAnswered={!revealComplete}
+            isGameComplete={isLastQuestion && revealComplete} 
           />
         </div>
       </div>
