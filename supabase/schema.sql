@@ -9,6 +9,7 @@ create table if not exists games (
   status text not null check (status in ('waiting', 'playing', 'revealing', 'finished')),
   current_question integer not null default 0,
   host_id uuid not null,
+  questions jsonb not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
