@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import Map, { Marker, MapLayerMouseEvent } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapPin } from 'lucide-react';
@@ -15,7 +15,21 @@ interface MapComponentProps {
   interactive?: boolean;
   showLabels?: boolean;
   showMarkerLabels?: boolean;
+  key?: string;
 }
+
+const DEFAULT_VIEW_STATE = {
+  longitude: 0,
+  latitude: 20,
+  zoom: 1.5,
+  bearing: 0,
+  pitch: 0
+};
+
+const MAP_STYLES = {
+  satellite: "mapbox://styles/mapbox/satellite-streets-v12",
+  dark: "mapbox://styles/mapbox/dark-v11"
+};
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -26,6 +40,98 @@ const MapComponent = forwardRef<any, MapComponentProps>(({
   showLabels = false,
   showMarkerLabels = false
 }, ref) => {
+  const mapRef = React.useRef<any>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [currentStyle, setCurrentStyle] = useState(showLabels ? MAP_STYLES.dark : MAP_STYLES.satellite);
+
+  // Auto refresh tiles when map is loaded
+  useEffect(() => {
+    if (mapRef.current && mapLoaded) {
+      const refreshTiles = () => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        // Store current view state
+        const currentCenter = map.getCenter();
+        const currentZoom = map.getZoom();
+
+        // Trigger a subtle zoom change to force tile refresh
+        map.easeTo({
+          center: currentCenter,
+          zoom: currentZoom + 0.0001,
+          duration: 0,
+          essential: true
+        });
+
+        // Return to exact previous state
+        requestAnimationFrame(() => {
+          map.easeTo({
+            center: currentCenter,
+            zoom: currentZoom,
+            duration: 0,
+            essential: true
+          });
+        });
+      };
+
+      // Initial refresh
+      const initialRefreshTimeout = setTimeout(refreshTiles, 500);
+
+      // Periodic refresh for newly loaded tiles
+      const periodicRefresh = setInterval(refreshTiles, 5000);
+
+      return () => {
+        clearTimeout(initialRefreshTimeout);
+        clearInterval(periodicRefresh);
+      };
+    }
+  }, [mapLoaded]);
+
+  useImperativeHandle(ref, () => ({
+    flyTo: (options: any) => {
+      if (mapRef.current && mapLoaded) {
+        mapRef.current.flyTo({
+          ...options,
+          essential: true
+        });
+      }
+    },
+    resetView: () => {
+      if (mapRef.current && mapLoaded) {
+        mapRef.current.flyTo({
+          ...DEFAULT_VIEW_STATE,
+          duration: 0,
+          essential: true
+        });
+      }
+    }
+  }));
+
+  useEffect(() => {
+    const newStyle = showLabels ? MAP_STYLES.dark : MAP_STYLES.satellite;
+    if (mapRef.current && mapLoaded && currentStyle !== newStyle) {
+      setCurrentStyle(newStyle);
+    }
+  }, [showLabels, mapLoaded]);
+
+  useEffect(() => {
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (mapRef.current && mapLoaded && markers.length === 0) {
+      mapRef.current.flyTo({
+        ...DEFAULT_VIEW_STATE,
+        duration: 1000,
+        essential: true
+      });
+    }
+  }, [markers, mapLoaded]);
+
   if (!MAPBOX_TOKEN) {
     console.error('Mapbox token not found');
     return (
@@ -38,28 +144,30 @@ const MapComponent = forwardRef<any, MapComponentProps>(({
   return (
     <div className="relative w-full h-full">
       <Map
-        ref={ref}
+        ref={mapRef}
         mapboxAccessToken={MAPBOX_TOKEN}
-        initialViewState={{
-          longitude: 0,
-          latitude: 20,
-          zoom: 1.5
-        }}
+        initialViewState={DEFAULT_VIEW_STATE}
         style={{ width: '100%', height: '100%' }}
-        mapStyle={showLabels ? 
-          "mapbox://styles/mapbox/dark-v11" : 
-          "mapbox://styles/mapbox/satellite-v9"
-        }
+        mapStyle={currentStyle}
         onClick={onMapClick}
         interactive={interactive}
         attributionControl={false}
         cursor={onMapClick ? 'crosshair' : 'grab'}
         renderWorldCopies={true}
         maxBounds={[[-180, -85], [180, 85]]}
+        onLoad={() => setMapLoaded(true)}
+        reuseMaps={false}
+        preserveDrawingBuffer={true}
+        terrain={showLabels ? undefined : { source: 'mapbox-dem', exaggeration: 1.5 }}
+        fog={{
+          range: [0.8, 8],
+          color: '#242B4B',
+          'horizon-blend': 0.5
+        }}
       >
-        {markers.map((marker, index) => (
+        {mapLoaded && markers.map((marker, index) => (
           <Marker
-            key={index}
+            key={`${marker.latitude}-${marker.longitude}-${index}`}
             longitude={marker.longitude}
             latitude={marker.latitude}
             anchor="bottom"
