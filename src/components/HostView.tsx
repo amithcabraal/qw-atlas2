@@ -63,26 +63,47 @@ export default function HostView({
   const mapRef = useRef<any>(null);
 
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
-  const isLastQuestion = currentQuestion === 5; // Since we're using 6 questions (0-5)
+  const isLastQuestion = currentQuestion === 5;
 
+  // Reset state when question changes
   useEffect(() => {
-    setShowingAnswers(false);
-    setDisplayedAnswers([]);
-    setIsRevealing(false);
-    setError(null);
-    setRevealComplete(false);
-    setPlayersWithScores(players.map(player => ({
-      ...player,
-      lastScore: player.score
-    })));
-    
-    // Force map remount
-    setMapKey(prev => prev + 1);
-    
-    // Reset map view if ref exists
-    if (mapRef.current) {
-      mapRef.current.resetView();
-    }
+    const resetView = async () => {
+      setShowingAnswers(false);
+      setDisplayedAnswers([]);
+      setIsRevealing(false);
+      setError(null);
+      setRevealComplete(false);
+      setPlayersWithScores(players.map(player => ({
+        ...player,
+        lastScore: player.score
+      })));
+      
+      // Force map remount
+      setMapKey(prev => prev + 1);
+
+      // Wait for map to mount
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (mapRef.current) {
+        // Zoom out
+        mapRef.current.flyTo({
+          zoom: 0,
+          duration: 1000
+        });
+        
+        // Wait for zoom out
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Zoom back in to world view
+        mapRef.current.flyTo({
+          center: [0, 20],
+          zoom: 1.5,
+          duration: 1000
+        });
+      }
+    };
+
+    resetView();
   }, [currentQuestion, players]);
 
   useEffect(() => {
@@ -94,19 +115,10 @@ export default function HostView({
   const revealAnswersSequentially = async () => {
     if (!mapRef.current) return;
 
-    console.log('Revealing answers for question:', {
-      questionText: question.text,
-      questionNumber: currentQuestion,
-      correctLocation: {
-        latitude: question.latitude,
-        longitude: question.longitude
-      },
-      answers: propAnswers,
-      totalAnswers: propAnswers.length
-    });
+    console.log('Starting reveal sequence');
+    setDisplayedAnswers([]); // Clear any existing markers
 
     // First, fly to the correct location
-    console.log('Flying to correct location');
     mapRef.current.flyTo({
       center: [question.longitude, question.latitude],
       zoom: 5,
@@ -116,25 +128,33 @@ export default function HostView({
     // Wait for the fly animation
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Show correct answer marker first
-    console.log('Showing correct answer marker');
-    setDisplayedAnswers([]);
+    // Show correct answer marker
+    setDisplayedAnswers([{
+      id: 'correct',
+      player_id: 'correct',
+      game_id: gameId,
+      question_id: currentQuestion,
+      latitude: question.latitude,
+      longitude: question.longitude,
+      distance: 0,
+      score: 1000
+    }]);
+
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Filter answers for current question
+    // Filter and sort answers
     const relevantAnswers = propAnswers
       .filter(a => a.question_id === currentQuestion)
-      .sort((a, b) => b.score - a.score); // Sort by score, highest first
+      .sort((a, b) => b.score - a.score);
 
-    console.log('Starting to reveal player answers:', relevantAnswers.length);
+    console.log('Revealing answers:', relevantAnswers);
 
     // Reveal answers one by one
     for (let i = 0; i < relevantAnswers.length; i++) {
       const answer = relevantAnswers[i];
-      const isTopScore = i < 3; // Top 3 scores
+      const isTopScore = i < 3;
       const delay = isTopScore ? 1000 : 500;
 
-      // For top scores, adjust the map view
       if (isTopScore) {
         mapRef.current.flyTo({
           center: [answer.longitude, answer.latitude],
@@ -148,8 +168,7 @@ export default function HostView({
       await new Promise(resolve => setTimeout(resolve, delay));
     }
 
-    // Finally, show the full view
-    console.log('Showing final overview');
+    // Final overview
     mapRef.current.flyTo({
       center: [question.longitude, question.latitude],
       zoom: 3,
@@ -183,16 +202,18 @@ export default function HostView({
       fill: true,
       label: 'Correct Location'
     },
-    ...displayedAnswers.map(answer => {
-      const player = players.find(p => p.id === answer.player_id);
-      return {
-        latitude: answer.latitude,
-        longitude: answer.longitude,
-        color: 'text-red-500',
-        fill: true,
-        label: `${player?.initials || 'Unknown'} (${answer.score} pts)`
-      };
-    })
+    ...displayedAnswers
+      .filter(answer => answer.player_id !== 'correct')
+      .map(answer => {
+        const player = players.find(p => p.id === answer.player_id);
+        return {
+          latitude: answer.latitude,
+          longitude: answer.longitude,
+          color: 'text-red-500',
+          fill: true,
+          label: `${player?.initials || 'Unknown'} (${answer.score} pts)`
+        };
+      })
   ] : [];
 
   return (
