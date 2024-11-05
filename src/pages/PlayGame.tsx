@@ -5,6 +5,7 @@ import HostView from '../components/HostView';
 import PlayerView from '../components/PlayerView';
 import GameComplete from '../components/GameComplete';
 import { useGameActions } from '../hooks/useGameActions';
+import WaitingRoom from '../components/WaitingRoom';
 
 export default function PlayGame() {
   const { gameId } = useParams();
@@ -210,6 +211,10 @@ export default function PlayGame() {
   }
 
   if (role === 'player' && currentPlayer) {
+    if (game.status === 'waiting') {
+      return <WaitingRoom players={players} />;
+    }
+
     return (
       <PlayerView
         gameId={gameId}
