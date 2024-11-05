@@ -53,9 +53,8 @@ export default function HostView({
   onRevealAnswers,
   question
 }: HostViewProps) {
-  const [showingAnswers, setShowingAnswers] = useState(false);
+  const [isRevealing, setIsRevealing] = useState(false);
   const [displayedAnswers, setDisplayedAnswers] = useState<Answer[]>([]);
-  const [isAnimating, setIsAnimating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [playersWithScores, setPlayersWithScores] = useState<Player[]>(players);
   const mapRef = useRef<any>(null);
@@ -63,67 +62,42 @@ export default function HostView({
   const allPlayersAnswered = players.length > 0 && players.every(p => p.has_answered);
   const isLastQuestion = currentQuestion === 5;
 
+  // Reset state when question changes
   useEffect(() => {
-    console.log('Current question changed:', {
-      currentQuestion,
-      questionId: question.id,
-      totalAnswers: propAnswers.length,
-      answers: propAnswers
-    });
-
-    setShowingAnswers(false);
+    setIsRevealing(false);
     setDisplayedAnswers([]);
-    setIsAnimating(false);
     setError(null);
     setPlayersWithScores(players.map(player => ({
       ...player,
       lastScore: player.score
     })));
-  }, [currentQuestion, question.id, propAnswers]);
-
-  useEffect(() => {
-    if (showingAnswers) {
-      revealAnswersSequentially();
-    }
-  }, [showingAnswers]);
+  }, [currentQuestion, players]);
 
   const revealAnswersSequentially = async () => {
-    if (!mapRef.current || isAnimating) return;
-
-    // Get relevant answers for the current question
-    const relevantAnswers = propAnswers.filter(a => a.question_id === question.id - 1);
-
-    console.log('Revealing answers for question:', {
-      questionNumber: currentQuestion + 1,
-      questionId: question.id,
-      questionText: question.text,
-      correctLocation: {
-        latitude: question.latitude,
-        longitude: question.longitude
-      },
-      totalAnswers: relevantAnswers.length,
-      answers: relevantAnswers,
-      allAnswers: propAnswers
-    });
+    if (!mapRef.current || isRevealing) return;
 
     try {
-      setIsAnimating(true);
-      setDisplayedAnswers([]); // Clear any existing markers
+      setIsRevealing(true);
+      setDisplayedAnswers([]); // Clear existing markers
+
+      console.log('Starting reveal sequence:', {
+        questionId: question.id,
+        currentQuestion,
+        correctLocation: { lat: question.latitude, lng: question.longitude }
+      });
 
       // First, fly to the correct location
-      console.log('Flying to correct location');
       mapRef.current.flyTo({
         center: [question.longitude, question.latitude],
         zoom: 5,
         duration: 2000
       });
 
-      // Wait for the fly animation
+      // Wait for initial fly animation
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Show the correct answer marker first
-      console.log('Showing correct answer marker');
-      const correctAnswer = {
+      // Add correct answer marker
+      const correctMarker = {
         id: 'correct',
         player_id: 'correct',
         game_id: gameId,
@@ -133,41 +107,32 @@ export default function HostView({
         distance: 0,
         score: 1000
       };
-      setDisplayedAnswers([correctAnswer]);
+      setDisplayedAnswers([correctMarker]);
 
+      // Wait for correct marker to appear
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Sort answers by score
-      const sortedAnswers = [...relevantAnswers].sort((a, b) => b.score - a.score);
+      // Get and sort player answers
+      const relevantAnswers = propAnswers
+        .filter(a => a.question_id === question.id - 1)
+        .sort((a, b) => b.score - a.score);
 
-      console.log('Starting to reveal player answers:', {
-        totalAnswers: sortedAnswers.length,
-        answers: sortedAnswers.map(a => ({
-          playerId: a.player_id,
-          score: a.score,
-          location: { lat: a.latitude, lng: a.longitude }
-        }))
+      console.log('Player answers to reveal:', {
+        total: relevantAnswers.length,
+        answers: relevantAnswers
       });
 
-      // Reveal answers one by one
-      for (let i = 0; i < sortedAnswers.length; i++) {
-        const answer = sortedAnswers[i];
+      // Reveal each player answer
+      for (const answer of relevantAnswers) {
         const player = players.find(p => p.id === answer.player_id);
-        console.log('Revealing answer for player:', {
+        console.log('Revealing answer:', {
           player: player?.initials,
           score: answer.score,
-          location: {
-            latitude: answer.latitude,
-            longitude: answer.longitude
-          }
+          location: { lat: answer.latitude, lng: answer.longitude }
         });
 
-        const isTopScore = i < 3;
-        const delay = isTopScore ? 1000 : 500;
-
-        // For top scores, adjust the map view
-        if (isTopScore) {
-          console.log('Flying to top score answer');
+        // For top 3 scores, do a fly animation
+        if (answer.score >= relevantAnswers[2]?.score) {
           mapRef.current.flyTo({
             center: [answer.longitude, answer.latitude],
             zoom: 4,
@@ -176,44 +141,37 @@ export default function HostView({
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
-        // Add this answer to the displayed answers
         setDisplayedAnswers(prev => [...prev, answer]);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // Finally, show the full view
-      console.log('Showing final overview');
+      // Final overview
       mapRef.current.flyTo({
         center: [question.longitude, question.latitude],
         zoom: 3,
         duration: 1500
       });
-    } catch (error) {
-      console.error('Animation error:', error);
-      setError('Failed to animate answers');
-    } finally {
-      setIsAnimating(false);
+
+    } catch (err) {
+      console.error('Error in reveal sequence:', err);
+      setError('Failed to reveal answers');
     }
   };
 
   const handleReveal = async () => {
-    if (isAnimating || !allPlayersAnswered) return;
+    if (isRevealing || !allPlayersAnswered) return;
 
     try {
-      setIsAnimating(true);
-      setError(null);
       await onRevealAnswers();
-      setShowingAnswers(true);
+      revealAnswersSequentially();
     } catch (err) {
       console.error('Error revealing answers:', err);
       setError('Failed to reveal answers');
-    } finally {
-      setIsAnimating(false);
     }
   };
 
-  // Calculate markers based on current state
-  const markers = showingAnswers ? displayedAnswers.map(answer => {
+  // Transform displayed answers into markers
+  const markers = displayedAnswers.map(answer => {
     if (answer.player_id === 'correct') {
       return {
         latitude: answer.latitude,
@@ -223,6 +181,7 @@ export default function HostView({
         label: 'Correct Location'
       };
     }
+
     const player = players.find(p => p.id === answer.player_id);
     return {
       latitude: answer.latitude,
@@ -231,7 +190,7 @@ export default function HostView({
       fill: true,
       label: `${player?.initials || 'Unknown'} (${answer.score} pts)`
     };
-  }) : [];
+  });
 
   return (
     <div className="container mx-auto max-w-4xl p-4 space-y-6">
@@ -248,10 +207,10 @@ export default function HostView({
             showHint={true} 
           />
           <div className="mt-4 space-y-4">
-            {allPlayersAnswered && !showingAnswers && (
+            {allPlayersAnswered && !isRevealing && displayedAnswers.length === 0 && (
               <button
                 onClick={handleReveal}
-                disabled={isAnimating}
+                disabled={isRevealing}
                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 
                          text-white rounded-lg font-medium transition-colors 
                          flex items-center justify-center gap-2
@@ -261,7 +220,7 @@ export default function HostView({
                 Reveal Answers
               </button>
             )}
-            {showingAnswers && !isAnimating && (
+            {displayedAnswers.length > 0 && !isRevealing && (
               <button
                 onClick={onNextQuestion}
                 className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 
@@ -289,8 +248,8 @@ export default function HostView({
           </h2>
           <PlayerList 
             players={playersWithScores} 
-            showAnswered={!showingAnswers}
-            isGameComplete={isLastQuestion && showingAnswers} 
+            showAnswered={!isRevealing}
+            isGameComplete={isLastQuestion && displayedAnswers.length > 0} 
           />
         </div>
       </div>
@@ -298,9 +257,9 @@ export default function HostView({
         <MapComponent 
           ref={mapRef}
           markers={markers}
-          interactive={true}
-          showLabels={showingAnswers}
-          showMarkerLabels={showingAnswers}
+          interactive={!isRevealing}
+          showLabels={displayedAnswers.length > 0}
+          showMarkerLabels={displayedAnswers.length > 0}
         />
       </div>
     </div>
