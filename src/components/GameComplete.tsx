@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Trophy, Share2, Home } from 'lucide-react';
 import PlayerList from './PlayerList';
 import { clearGameState } from '../lib/gameUtils';
@@ -83,6 +83,15 @@ export default function GameComplete({ players }: GameCompleteProps) {
             <Home className="w-5 h-5" />
             Play Again
           </button>
+
+          <Link
+            to="/"
+            className="block w-full py-3 px-4 bg-gray-600 hover:bg-gray-700 
+                     text-white rounded-lg font-medium transition-colors
+                     text-center"
+          >
+            Back to Home
+          </Link>
         </div>
       </div>
     </div>
