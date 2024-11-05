@@ -93,18 +93,19 @@ export default function HostView({
     // Wait for the fly animation
     await new Promise(resolve => setTimeout(resolve, 2000));
 
+    // Filter answers for current question
     const relevantAnswers = propAnswers
       .filter(a => a.question_id === currentQuestion)
-      .sort((a, b) => b.distance - a.distance); // Sort by distance, furthest first
+      .sort((a, b) => b.score - a.score); // Sort by score, highest first
 
     // Reveal answers one by one
     for (let i = 0; i < relevantAnswers.length; i++) {
-      const isTopFive = i >= relevantAnswers.length - 5;
-      const delay = isTopFive ? 1000 : 500; // Longer delay for top 5
+      const answer = relevantAnswers[i];
+      const isTopScore = i < 3; // Top 3 scores
+      const delay = isTopScore ? 1000 : 500;
 
-      // If it's a top 5 answer, adjust the map view
-      if (isTopFive) {
-        const answer = relevantAnswers[i];
+      // For top scores, adjust the map view
+      if (isTopScore) {
         mapRef.current.flyTo({
           center: [answer.longitude, answer.latitude],
           zoom: 4,
@@ -113,7 +114,7 @@ export default function HostView({
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
-      setDisplayedAnswers(prev => [...prev, relevantAnswers[i]]);
+      setDisplayedAnswers(prev => [...prev, answer]);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
 
