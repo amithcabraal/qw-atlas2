@@ -1,11 +1,12 @@
-export const questions: Question[] = [
+
+export const questions: Question[] = [ 
   {
     id: 1,
     text: "Where is the Eiffel Tower located?",
     latitude: 48.8584,
     longitude: 2.2945,
     hint: "This iconic iron lattice tower is located in the capital of France",
-    image: "https://images.unsplash.com/photo-1431274172761-fca41d930114?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-FN5XKGb/0/Mnt5w2DRNjbj3hvZsKBDkM9tv8SVh68JGZxtpP9D3/L/AdobeStock_170589233_Preview-L.jpg"
   },
   {
     id: 2,
@@ -13,7 +14,7 @@ export const questions: Question[] = [
     latitude: 29.9792,
     longitude: 31.1342,
     hint: "This ancient wonder is located in Egypt",
-    image: "https://images.unsplash.com/photo-1503177119275-0aa32b3a9368?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-rKpxnM3/0/Mz3233LjzN7GMRC2J3WJ53Qs2Knh8dhcX4HCgBR58/L/AdobeStock_194613298_Preview-L.jpg"
   },
   {
     id: 3,
@@ -21,7 +22,7 @@ export const questions: Question[] = [
     latitude: -13.1631,
     longitude: -72.5450,
     hint: "This Incan citadel sits high in the Andes Mountains",
-    image: "https://images.unsplash.com/photo-1526392060635-9d6019884377?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-dhQJBVD/0/LLbWddSNfFPsrLZ2XnTtjGsZpMvXZ95fvTgDg5Zhv/L/AdobeStock_253170368_Preview-L.jpg"
   },
   {
     id: 4,
@@ -29,7 +30,7 @@ export const questions: Question[] = [
     latitude: 27.1751,
     longitude: 78.0421,
     hint: "This ivory-white marble mausoleum is located in Agra",
-    image: "https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-4WCmf2J/0/KmQq34BqJwCfX8Rj3nPr694cqRWngzBJXB6jgXS6M/L/AdobeStock_130860698_Preview-L.jpg"
   },
   {
     id: 5,
@@ -37,7 +38,7 @@ export const questions: Question[] = [
     latitude: 40.6892,
     longitude: -74.0445,
     hint: "This copper statue stands on Liberty Island in New York Harbor",
-    image: "https://images.unsplash.com/photo-1605130284535-11dd9eedc58a?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-kLT2pbD/0/LxGLcs5rmC27nXzrZdBZqvwn56qF3qJLmdPX8p7CV/L/AdobeStock_268267939_Preview-L.jpg"
   },
   {
     id: 6,
@@ -45,7 +46,7 @@ export const questions: Question[] = [
     latitude: -33.8568,
     longitude: 151.2153,
     hint: "This performing arts center is located in Sydney Harbour",
-    image: "https://images.unsplash.com/photo-1624138784614-87fd1b6528f8?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-w7BGRSx/0/L544dzjNcJ3C8hn4KGPMLGqWwhXFxzmb7HShZSZsq/L/AdobeStock_895302364_Preview-L.jpg"
   },
   {
     id: 7,
@@ -53,7 +54,7 @@ export const questions: Question[] = [
     latitude: 41.8902,
     longitude: 12.4922,
     hint: "This ancient amphitheater is located in Rome",
-    image: "https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-CkfqcpT/0/LZpqh54Zd6TjbT6GVwPBmq8kDdCBQsM3PkVg8jR3h/L/AdobeStock_144602594_Preview-L.jpg"
   },
   {
     id: 8,
@@ -61,7 +62,7 @@ export const questions: Question[] = [
     latitude: -22.9519,
     longitude: -43.2105,
     hint: "This Art Deco statue overlooks Rio de Janeiro",
-    image: "https://images.unsplash.com/photo-1593995863951-57c27e518295?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-wTfrdP2/0/KSTB6VGX9CQN9ks6k7Rj3dPVG9cVKzbmPpb44D9hQ/L/1000_F_815628904_MWYxNJOITMNUPAOFIdYeTuKnRVPoLFDV-L.jpg"
   },
   {
     id: 9,
@@ -69,7 +70,7 @@ export const questions: Question[] = [
     latitude: 30.3285,
     longitude: 35.4444,
     hint: "This ancient city is carved into rose-colored rock faces",
-    image: "https://images.unsplash.com/photo-1579606032821-4e6161c81bd3?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-9QP594P/0/KP4J7VwCdgRZc4hT4BqPV2vhL43VbmgRnbfV3RbWb/L/AdobeStock_286721156_Preview-L.jpg"
   },
   {
     id: 10,
@@ -77,7 +78,7 @@ export const questions: Question[] = [
     latitude: 35.3606,
     longitude: 138.7278,
     hint: "This iconic volcano is Japan's highest peak",
-    image: "https://images.unsplash.com/photo-1570459027562-4a916cc6113f?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-FBrR5sF/0/MZc7R6X4TNMhvH5Xz6ZZ7NmjpS9ChSz9wDRbsN2B8/L/AdobeStock_192483501_Preview-L.jpg"
   },
   {
     id: 11,
@@ -85,7 +86,7 @@ export const questions: Question[] = [
     latitude: 37.9715,
     longitude: 23.7267,
     hint: "This ancient citadel sits above Athens",
-    image: "https://images.unsplash.com/photo-1555993539-1732b0258235?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-LPvWbcc/0/NKWNBzMK3wXRpd7Qg5935hRNJmkRPzkqqzHwb3FBP/L/AdobeStock_129050920_Preview-L.jpg"
   },
   {
     id: 12,
@@ -93,7 +94,7 @@ export const questions: Question[] = [
     latitude: 13.4125,
     longitude: 103.8670,
     hint: "This temple complex is Cambodia's most famous landmark",
-    image: "https://images.unsplash.com/photo-1600820641817-86ac1b0c2c1c?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-j5NXQWr/0/K5rjSGsLRrxRLVJgBMBrfm3V3769xZ6sKMHmmxmKp/L/AdobeStock_132855615_Preview-L.jpg"
   },
   {
     id: 13,
@@ -101,7 +102,7 @@ export const questions: Question[] = [
     latitude: 39.9042,
     longitude: 116.4074,
     hint: "This imperial palace complex is in Beijing",
-    image: "https://images.unsplash.com/photo-1584646098378-0874589d76b1?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-zhSxRDN/0/LwBWHkrqWpbgF5CLt6xHw94gbMWNNgjM2cDT5gvbt/L/AdobeStock_64166638_Preview-L.jpg"
   },
   {
     id: 14,
@@ -109,7 +110,7 @@ export const questions: Question[] = [
     latitude: 41.4036,
     longitude: 2.1744,
     hint: "This unfinished basilica is Barcelona's most famous landmark",
-    image: "https://images.unsplash.com/photo-1583779457094-ab6f77f7bf57?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-qVHq3ZL/0/LF22dq94jf7Wmf4g66BsBNQbBT2RgsphMc5fPbMgM/L/AdobeStock_105502541_Preview-L.jpg"
   },
   {
     id: 15,
@@ -117,7 +118,7 @@ export const questions: Question[] = [
     latitude: 25.1972,
     longitude: 55.2744,
     hint: "This is the world's tallest building",
-    image: "https://images.unsplash.com/photo-1582672060674-bc2bd808a8b5?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-86SWjx9/0/LjdxKgDMgzbLF2ksTJFsBVcVNNzFHjp5nWPmM8FtC/L/AdobeStock_371784484_Preview-L.jpg"
   },
   {
     id: 16,
@@ -125,7 +126,7 @@ export const questions: Question[] = [
     latitude: 37.8199,
     longitude: -122.4783,
     hint: "This suspension bridge is San Francisco's iconic landmark",
-    image: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-w2Zcsjt/0/NWSZ8FzL8qHxfDckhFmcgvMpn8MmZvTxHMFnSs4cQ/L/AdobeStock_247456087_Preview-L.jpg"
   },
   {
     id: 17,
@@ -133,7 +134,7 @@ export const questions: Question[] = [
     latitude: 41.0054,
     longitude: 28.9768,
     hint: "This historic mosque is in Istanbul",
-    image: "https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-TgWDPpq/0/LBQj3JcVfkrZsCS3t4wqH58FPhLTwnDwZTFK48m2F/L/AdobeStock_126013644_Preview-L.jpg"
   },
   {
     id: 18,
@@ -141,23 +142,15 @@ export const questions: Question[] = [
     latitude: 51.1789,
     longitude: -1.8262,
     hint: "This prehistoric monument stands on Salisbury Plain",
-    image: "https://images.unsplash.com/photo-1599833975787-5c143f373c30?auto=format&fit=crop&q=80"
-  },
-  {
-    id: 19,
-    text: "Where is the Kremlin?",
-    latitude: 55.7520,
-    longitude: 37.6175,
-    hint: "This fortified complex is in the heart of Moscow",
-    image: "https://images.unsplash.com/photo-1513326738677-b964603b136d?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-t9qsg9G/0/MT6CP4wbfdkJWF2Bf2mQnrzDmz8W4hksQw2MXzxxS/S/OIP%20%281%29-S.jpg"
   },
   {
     id: 20,
     text: "Find the Petronas Towers",
     latitude: 3.1577,
     longitude: 101.7114,
-    hint: "These twin skyscrapers dominate Kuala Lumpur's skyline",
-    image: "https://images.unsplash.com/photo-1604728717068-e9e1f12c2e43?auto=format&fit=crop&q=80"
+    hint: "These twin skyscrapers dominate the skyline",
+    image: "https://photos.smugmug.com/Places/Locations/i-9qV7Qx3/0/NdrwwrQtqr4LTKHNdPxjdRVg8HDbvb53SX4XcxKPp/L/AdobeStock_815601944_Preview-L.jpg"
   },
   {
     id: 21,
@@ -165,7 +158,7 @@ export const questions: Question[] = [
     latitude: -27.1127,
     longitude: -109.3497,
     hint: "These monolithic human figures are on Easter Island",
-    image: "https://images.unsplash.com/photo-1597240890284-c93f86e4e3d9?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-DNBWnwv/0/MtRxD3HhVfxR9h73LV6hDrf5wHSgG9Kt8D2qw56r2/L/AdobeStock_36055011_Preview-L.jpg"
   },
   {
     id: 22,
@@ -173,7 +166,7 @@ export const questions: Question[] = [
     latitude: 52.5163,
     longitude: 13.3777,
     hint: "This neoclassical monument is in Berlin",
-    image: "https://images.unsplash.com/photo-1566404791232-af9fe0ae8f8b?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-5T8nKkD/0/LFSmrQhc55qZJkK5t5kx5FVJ9dw7nmTPZ3LFPMj9C/L/AdobeStock_160523273_Preview-L.jpg"
   },
   {
     id: 23,
@@ -181,23 +174,16 @@ export const questions: Question[] = [
     latitude: 37.9715,
     longitude: 23.7267,
     hint: "This ancient temple sits atop the Acropolis",
-    image: "https://images.unsplash.com/photo-1603565816030-6b389eeb23cb?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-LPvWbcc/0/NKWNBzMK3wXRpd7Qg5935hRNJmkRPzkqqzHwb3FBP/L/AdobeStock_129050920_Preview-L.jpg"
   },
-  {
-    id: 24,
-    text: "Locate Big Ben",
-    latitude: 51.5007,
-    longitude: -0.1246,
-    hint: "This famous clock tower stands beside the Thames",
-    image: "https://images.unsplash.com/photo-1529655683826-aba9b3e77383?auto=format&fit=crop&q=80"
-  },
+  
   {
     id: 25,
     text: "Where is the Louvre Museum?",
     latitude: 48.8606,
     longitude: 2.3376,
     hint: "This art museum is housed in a historic palace in Paris",
-    image: "https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-s9Q8MXB/0/KVNGjX5dw84qnf5cJ6sVXTDtGNWVz42Qg4thzJtVH/L/AdobeStock_993607916_Preview-L.jpg"
   },
   {
     id: 26,
@@ -205,7 +191,7 @@ export const questions: Question[] = [
     latitude: 41.0086,
     longitude: 28.9802,
     hint: "This ancient basilica-turned-mosque is in Istanbul",
-    image: "https://images.unsplash.com/photo-1626275320156-4906b2e8c9dd?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-3QBzc8F/0/LJb2X5bJwmQT4CFQDt5bxqMNpLwQbDMCVJhVgRtj8/L/AdobeStock_231708819_Preview-L.jpg"
   },
   {
     id: 27,
@@ -213,7 +199,7 @@ export const questions: Question[] = [
     latitude: 43.7230,
     longitude: 10.3966,
     hint: "This famously tilted bell tower is in Italy",
-    image: "https://images.unsplash.com/photo-1522918448933-b33e408a411a?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-QJG38dz/0/LRk8H2vLTQMTQF82QWtV2z87PC4VtzvZBRJtLWGpH/L/AdobeStock_56575403_Preview-L.jpg"
   },
   {
     id: 28,
@@ -221,7 +207,7 @@ export const questions: Question[] = [
     latitude: 40.4319,
     longitude: 116.5704,
     hint: "This is the location of the Mutianyu section",
-    image: "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-qkxWNKK/0/NKGhjWGDppRgJRh7PBRXBj47FVbV9bVthrP2Lhwxv/L/AdobeStock_113303768_Preview-L.jpg"
   },
   {
     id: 29,
@@ -229,7 +215,7 @@ export const questions: Question[] = [
     latitude: 41.9029,
     longitude: 12.4545,
     hint: "This chapel is in Vatican City",
-    image: "https://images.unsplash.com/photo-1594844181208-d92c2c72f4be?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-Pbqd9Zz/0/MpT44SDzmdpWNjW33HvPkvg24x2RrZb6hfvDnSVZj/L/AdobeStock_47608343_Preview-L.jpg"
   },
   {
     id: 30,
@@ -237,7 +223,6 @@ export const questions: Question[] = [
     latitude: 48.8048,
     longitude: 2.1203,
     hint: "This royal château is southwest of Paris",
-    image: "https://images.unsplash.com/photo-1596636478939-6d53d4f1dbae?auto=format&fit=crop&q=80"
+    image: "https://photos.smugmug.com/Places/Locations/i-Qt5bXJc/0/M8Ls6FtrGsjXJHXw8M2ZZJdQwwVPbVt7KC6nMGKwx/L/AdobeStock_64258726_Preview-L.jpg"
   }
 ];
-
